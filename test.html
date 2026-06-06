@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试</title>
+</head>
+<body>
+    <div id="status">加载中...</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        const status = document.getElementById('status');
+        try {
+            status.textContent = '正在导入Three.js...';
+            const THREE = await import('three');
+            status.textContent = 'Three.js加载成功！版本: ' + THREE.REVISION;
+
+            // 测试场景创建
+            const scene = new THREE.Scene();
+            status.textContent += ' | 场景创建成功';
+
+            // 测试导入其他模块
+            status.textContent += ' | 正在导入控制器...';
+            const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+            status.textContent += ' 控制器加载成功';
+
+            status.textContent += '<br>所有测试通过！';
+        } catch (e) {
+            status.textContent = '错误: ' + e.message;
+            status.style.color = 'red';
+            console.error(e);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>模块测试</title>
+</head>
+<body>
+    <div id="status" style="font-size:18px;padding:20px;">加载中...</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        const status = document.getElementById('status');
+        const log = (msg) => {
+            status.innerHTML += msg + '<br>';
+            console.log(msg);
+        };
+
+        try {
+            log('1. 测试 scene.js...');
+            const { createScene, createLighting } = await import('./js/scene.js');
+            log('✓ scene.js OK');
+
+            log('2. 测试 shaders.js...');
+            const shaders = await import('./js/shaders.js');
+            log('✓ shaders.js OK');
+
+            log('3. 测试 planets.js...');
+            const planets = await import('./js/planets.js');
+            log('✓ planets.js OK');
+
+            log('4. 测试 orbital.js...');
+            const orbital = await import('./js/orbital.js');
+            log('✓ orbital.js OK');
+
+            log('5. 测试 controls.js...');
+            const controls = await import('./js/controls.js');
+            log('✓ controls.js OK');
+
+            log('6. 测试 effects.js...');
+            const effects = await import('./js/effects.js');
+            log('✓ effects.js OK');
+
+            log('7. 测试 ui.js...');
+            const ui = await import('./js/ui.js');
+            log('✓ ui.js OK');
+
+            log('8. 测试 starfield.js...');
+            const starfield = await import('./js/starfield.js');
+            log('✓ starfield.js OK');
+
+            log('<br><b style="color:green">所有模块加载成功！</b>');
+
+        } catch (e) {
+            log('<b style="color:red">错误: ' + e.message + '</b>');
+            log('<b style="color:red">文件: ' + (e.fileName || 'unknown') + '</b>');
+            log('<b style="color:red">行号: ' + (e.lineNumber || 'unknown') + '</b>');
+            console.error(e);
+        }
+    </script>
+</body>
+</html>

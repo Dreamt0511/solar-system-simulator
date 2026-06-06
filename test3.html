@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>完整测试</title>
+    <style>body{background:#000;color:#fff;font-size:20px;padding:20px;}</style>
+</head>
+<body>
+    <div id="log"></div>
+    <canvas id="c" width="400" height="300"></canvas>
+    <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+    </script>
+    <script type="module">
+    const log = (m) => { document.getElementById('log').innerHTML += m + '<br>'; console.log(m); };
+    try {
+        log('1. 加载 Three...');
+        const THREE = await import('three');
+        log('✓ Three ' + THREE.REVISION);
+
+        log('2. 加载场景模块...');
+        const { createScene, createLighting } = await import('./js/scene.js');
+        log('✓ scene.js');
+
+        log('3. 加载行星模块...');
+        const { createAllPlanets, PLANET_DATA } = await import('./js/planets.js');
+        log('✓ planets.js');
+
+        log('4. 加载轨道模块...');
+        const orbital = await import('./js/orbital.js');
+        log('✓ orbital.js');
+
+        log('5. 创建场景...');
+        const { scene, camera, renderer } = createScene();
+        log('✓ 场景创建成功');
+
+        log('6. 创建光照...');
+        createLighting(scene);
+        log('✓ 光照创建成功');
+
+        log('7. 创建行星...');
+        const planets = createAllPlanets(scene);
+        const keys = Object.keys(planets);
+        log('✓ 行星创建成功: ' + keys.join(', '));
+
+        log('8. 创建轨道...');
+        orbital.createAllOrbits(scene, PLANET_DATA);
+        log('✓ 轨道创建成功');
+
+        log('9. 渲染测试...');
+        renderer.render(scene, camera);
+        log('✓ 渲染成功');
+
+        log('<br><b style="color:#0f0">所有测试通过！</b>');
+
+    } catch(e) {
+        log('<br><b style="color:red">错误: ' + e.message + '</b>');
+        log('<b>堆栈: ' + e.stack?.split('\n').slice(0,3).join('<br>') + '</b>');
+    }
+    </script>
+</body>
+</html>
