@@ -338,3 +338,79 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
+
+/* 设置图标 */
+.settings-icon {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.settings-icon:hover {
+    background: rgba(0, 0, 0, 0.8);
+    transform: scale(1.1);
+}
+
+/* 控制面板定位 */
+#controls-panel {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 300px;
+    max-width: calc(100vw - 40px);
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* 纹理开关按钮 */
+#texture-toggle {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#texture-toggle:disabled {
+    background: #666;
+    cursor: not-allowed;
+}
+
+#texture-toggle:not(:disabled):hover {
+    background: #45a049;
+}
+
+/* 手机适配 */
+@media (max-width: 768px) {
+    .settings-icon {
+        bottom: 15px;
+        right: 15px;
+        width: 44px;
+        height: 44px;
+    }
+
+    #controls-panel {
+        bottom: 70px;
+        right: 15px;
+        width: calc(100vw - 30px);
+        max-width: 300px;
+    }
+}

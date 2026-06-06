@@ -7,6 +7,8 @@ import { PostProcessing } from './effects.js';
 import { UIManager } from './ui.js';
 import { Starfield } from './starfield.js';
 import { AsteroidBelt } from './asteroidBelt.js';
+import { TextureManager } from './textureManager.js';
+import { MaterialSwitcher } from './materialSwitcher.js';
 
 class SolarSystemApp {
     constructor() {
@@ -20,6 +22,8 @@ class SolarSystemApp {
         this.cameraController = null;
         this.postProcessing = null;
         this.uiManager = null;
+        this.textureManager = null;
+        this.materialSwitcher = null;
 
         this.clock = new THREE.Clock();
         this.simulationTime = 0;
@@ -55,6 +59,22 @@ class SolarSystemApp {
 
         // 创建行星
         this.planets = createAllPlanets(this.scene);
+
+        // 初始化纹理系统
+        this.textureManager = new TextureManager();
+        this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache);
+
+        // 加载纹理
+        this.textureManager.loadAll((loaded, total) => {
+            this.uiManager.setLoadingProgress(50 + (loaded / total) * 30, `加载纹理: ${loaded}/${total}`);
+        }).then(() => {
+            // 纹理加载完成，启用开关
+            const textureBtn = document.getElementById('texture-toggle');
+            if (textureBtn) {
+                textureBtn.disabled = false;
+                textureBtn.textContent = '开启';
+            }
+        });
 
         this.uiManager.setLoadingProgress(70, '计算轨道...');
 
@@ -116,6 +136,25 @@ class SolarSystemApp {
         this.uiManager.on('resetView', () => {
             this.cameraController.resetView();
         });
+
+        // 设置图标点击事件
+        const settingsBtn = document.getElementById('settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                this.uiManager.toggleControlsPanel();
+            });
+        }
+
+        // 纹理开关事件
+        const textureBtn = document.getElementById('texture-toggle');
+        if (textureBtn) {
+            textureBtn.addEventListener('click', () => {
+                if (this.materialSwitcher) {
+                    this.materialSwitcher.toggle();
+                    textureBtn.textContent = this.materialSwitcher.isTextureMode ? '关闭' : '开启';
+                }
+            });
+        }
     }
 
     animate() {
@@ -179,6 +218,16 @@ class SolarSystemApp {
             // 土星环已经是土星的子对象，会自动跟随
             // 但需要确保旋转同步
             this.planets.saturn.userData.rings.rotation.z = this.planets.saturn.rotation.y;
+        }
+    }
+
+    dispose() {
+        // 清理纹理系统
+        if (this.textureManager) {
+            this.textureManager.disposeAll();
+        }
+        if (this.materialSwitcher) {
+            this.materialSwitcher.dispose();
         }
     }
 }
