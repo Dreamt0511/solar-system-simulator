@@ -46,6 +46,32 @@ export class AsteroidBelt {
 
         this.mesh = mesh;
         this.group.add(mesh);
+
+        // 碰撞环：不可见但可被射线检测，覆盖整个小行星带区域
+        const hitGeometry = new THREE.TorusGeometry(46, 10, 4, 64);
+        const hitMaterial = new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const hitMesh = new THREE.Mesh(hitGeometry, hitMaterial);
+        hitMesh.rotation.x = Math.PI / 2;
+        hitMesh.userData = {
+            type: 'asteroidBelt',
+            data: {
+                name: '小行星带',
+                info: {
+                    radius: '1 ~ 100 km',
+                    mass: '约 3.0 × 10²¹ kg',
+                    distance: '2.2 ~ 3.2 AU',
+                    period: '3 ~ 6 年',
+                    moons: '无'
+                }
+            }
+        };
+        this.hitMesh = hitMesh;
+        this.group.add(hitMesh);
     }
 
     update(time) {
@@ -56,6 +82,11 @@ export class AsteroidBelt {
         if (!this.mesh) return;
 
         this.group.remove(this.mesh);
+        if (this.hitMesh) {
+            this.group.remove(this.hitMesh);
+            this.hitMesh.geometry.dispose();
+            this.hitMesh.material.dispose();
+        }
         this.scene.remove(this.group);
         this.mesh.geometry.dispose();
         this.mesh.material.dispose();

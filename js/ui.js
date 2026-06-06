@@ -86,6 +86,9 @@ export class UIManager {
         window.addEventListener('resize', () => {
             this.checkOrientation();
         });
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.checkOrientation(), 100);
+        });
 
         // 键盘快捷键
         document.addEventListener('keydown', (e) => {
@@ -119,7 +122,7 @@ export class UIManager {
     checkOrientation() {
         const isPortrait = window.innerHeight > window.innerWidth;
         if (this.elements.orientationWarning) {
-            if (isPortrait && window.innerWidth < 768) {
+            if (isPortrait) {
                 this.elements.orientationWarning.classList.remove('hidden');
             } else {
                 this.elements.orientationWarning.classList.add('hidden');

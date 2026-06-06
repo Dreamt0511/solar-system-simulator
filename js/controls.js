@@ -61,7 +61,7 @@ export class CameraController {
         // 获取所有可点击对象
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt')) {
                 clickableObjects.push(child);
             }
         });
@@ -84,7 +84,7 @@ export class CameraController {
 
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt')) {
                 clickableObjects.push(child);
             }
         });
@@ -125,6 +125,14 @@ export class CameraController {
         if (this.isAnimating) return;
         this.isAnimating = true;
 
+        // 小行星带特殊处理：飞到带中间高度俯瞰
+        if (planet.userData && planet.userData.type === 'asteroidBelt') {
+            const beltCenter = new THREE.Vector3(0, 0, 0);
+            const cameraTarget = new THREE.Vector3(0, 80, 100);
+            this.animateFly(cameraTarget, beltCenter, duration);
+            return;
+        }
+
         const targetPosition = planet.getWorldPosition(new THREE.Vector3());
         const planetRadius = planet.geometry ? planet.geometry.parameters.radius : 5;
 
@@ -144,28 +152,22 @@ export class CameraController {
         );
 
         // 保存初始位置
+        this.animateFly(cameraTarget, targetPosition, duration);
+    }
+
+    animateFly(cameraTarget, lookAtTarget, duration) {
         const startPosition = this.camera.position.clone();
         const startTarget = this.controls.target.clone();
-
-        // 动画
         const startTime = Date.now();
 
         const animate = () => {
             const elapsed = Date.now() - startTime;
             const progress = Math.min(elapsed / duration, 1);
-
-            // 缓动函数
             const eased = this.easeInOutCubic(progress);
 
-            // 插值相机位置
             this.camera.position.lerpVectors(startPosition, cameraTarget, eased);
-
-            // 保持身体垂直（up向量始终朝上）
             this.camera.up.set(0, 1, 0);
-
-            // 插控制器目标 - 看向行星
-            this.controls.target.lerpVectors(startTarget, targetPosition, eased);
-
+            this.controls.target.lerpVectors(startTarget, lookAtTarget, eased);
             this.controls.update();
 
             if (progress < 1) {

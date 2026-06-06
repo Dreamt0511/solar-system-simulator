@@ -150,10 +150,10 @@ export const PLANET_DATA = {
         orbitalInclination: 0.77,
         info: {
             radius: '25,362 km',
-            mass: '8.681 × 10²⁵ kg',
+            mass: '8.6813 × 10²⁵ kg',
             distance: '19.2 AU',
             period: '30,687 天',
-            moons: '27颗已知卫星'
+            moons: '28颗已知卫星'
         }
     },
     neptune: {
