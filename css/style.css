@@ -409,8 +409,27 @@ html, body {
 
     #controls-panel {
         bottom: 70px;
-        right: 15px;
-        width: calc(100vw - 30px);
-        max-width: 300px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-width: none;
+    }
+
+    .panel-content {
+        padding: 8px 12px;
+    }
+
+    .control-group {
+        margin-bottom: 12px;
+    }
+
+    .control-group label {
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+    }
+
+    .control-group button {
+        padding: 8px 12px;
+        font-size: 0.8rem;
     }
 }
