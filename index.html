@@ -28,6 +28,21 @@
     <!-- 主画布 -->
     <canvas id="solar-system-canvas"></canvas>
 
+    <!-- 行星列表 -->
+    <div id="planet-list">
+      <button id="planet-list-toggle" title="天体列表">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <div id="planet-list-panel" class="hidden">
+        <div class="planet-list-header">天体</div>
+        <div id="planet-list-items"></div>
+      </div>
+    </div>
+
     <!-- 设置图标 -->
     <button id="settings-btn" class="settings-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -85,6 +100,19 @@
             <div class="info-row">
                 <span class="label">卫星：</span>
                 <span id="planet-moons" class="value">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 暗淡蓝点引文弹窗 -->
+    <div id="pale-blue-dot" class="hidden">
+        <div class="quote-backdrop"></div>
+        <div class="quote-container">
+            <button class="quote-close">&times;</button>
+            <div class="quote-content">
+                <div class="quote-planet-icon"></div>
+                <p class="quote-text"></p>
+                <p class="quote-author"></p>
             </div>
         </div>
     </div>

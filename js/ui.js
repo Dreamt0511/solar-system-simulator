@@ -13,6 +13,10 @@ export class UIManager {
             resetBtn: document.getElementById('reset-btn'),
             closePanel: document.getElementById('close-panel'),
             closeInfo: document.getElementById('close-info'),
+            quoteOverlay: document.getElementById('pale-blue-dot'),
+            quoteText: document.querySelector('#pale-blue-dot .quote-text'),
+            quoteAuthor: document.querySelector('#pale-blue-dot .quote-author'),
+            quoteClose: document.querySelector('#pale-blue-dot .quote-close'),
             planetName: document.getElementById('planet-name'),
             planetRadius: document.getElementById('planet-radius'),
             planetMass: document.getElementById('planet-mass'),
@@ -90,6 +94,20 @@ export class UIManager {
             setTimeout(() => this.checkOrientation(), 100);
         });
 
+        // 关闭引文弹窗
+        if (this.elements.quoteClose) {
+            this.elements.quoteClose.addEventListener('click', () => {
+                this.hideQuoteOverlay();
+            });
+        }
+        if (this.elements.quoteOverlay) {
+            this.elements.quoteOverlay.addEventListener('click', (e) => {
+                if (e.target === this.elements.quoteOverlay || e.target.classList.contains('quote-backdrop')) {
+                    this.hideQuoteOverlay();
+                }
+            });
+        }
+
         // 键盘快捷键
         document.addEventListener('keydown', (e) => {
             this.handleKeyboard(e);
@@ -115,6 +133,7 @@ export class UIManager {
             case 'Escape':
                 this.hideInfoPanel();
                 this.hideControlsPanel();
+                this.hideQuoteOverlay();
                 break;
         }
     }
@@ -164,12 +183,35 @@ export class UIManager {
         this.elements.planetMoons.textContent = data.info.moons;
 
         this.elements.infoPanel.classList.remove('hidden');
+
+        // 如果有专属引文则显示弹窗
+        if (data.info.quote) {
+            setTimeout(() => {
+                this.showQuoteOverlay(data.info.quote, data.info.quoteSource);
+            }, 600);
+        }
     }
 
     // 隐藏信息面板
     hideInfoPanel() {
         if (this.elements.infoPanel) {
             this.elements.infoPanel.classList.add('hidden');
+        }
+        this.hideQuoteOverlay();
+    }
+
+    // 显示引文弹窗
+    showQuoteOverlay(text, source) {
+        if (!this.elements.quoteOverlay || !this.elements.quoteText || !this.elements.quoteAuthor) return;
+        this.elements.quoteText.textContent = text;
+        this.elements.quoteAuthor.textContent = source;
+        this.elements.quoteOverlay.classList.remove('hidden');
+    }
+
+    // 隐藏引文弹窗
+    hideQuoteOverlay() {
+        if (this.elements.quoteOverlay) {
+            this.elements.quoteOverlay.classList.add('hidden');
         }
     }
 

@@ -25,6 +25,9 @@ export class MaterialSwitcher {
         // 保存每个行星的原始材质，用于切换回纯色模式
         this.originalMaterials = new Map();
 
+        // 太阳光晕原始透明度
+        this.sunGlowOpacities = [];
+
         // 需要切换材质的行星键名（排除太阳、月球，它们有特殊处理）
         this.planetKeys = [
             'mercury', 'venus', 'earth', 'mars',
@@ -33,6 +36,8 @@ export class MaterialSwitcher {
 
         // 保存原始材质
         this._saveOriginalMaterials();
+        // 保存太阳光晕透明度
+        this._saveSunGlowOpacities();
     }
 
     /**
@@ -58,6 +63,16 @@ export class MaterialSwitcher {
         });
     }
 
+    _saveSunGlowOpacities() {
+        if (this.planets.sun) {
+            this.planets.sun.children.forEach(child => {
+                if (child.isSprite) {
+                    this.sunGlowOpacities.push(child.material.opacity);
+                }
+            });
+        }
+    }
+
     /**
      * 切换模式（纹理 <-> 纯色）
      */
@@ -77,6 +92,20 @@ export class MaterialSwitcher {
      * - 土星环 / 小行星带：不变
      */
     switchToTextureMode() {
+        // 隐藏所有行星光晕（保留太阳）
+        this.planetKeys.forEach(key => {
+            const planet = this.planets[key];
+            if (planet && planet.userData.glow) {
+                planet.userData.glow.visible = false;
+            }
+        });
+        // 月球光晕
+        if (this.planets.moon) {
+            this.planets.moon.children.forEach(child => {
+                if (child.isSprite) child.visible = false;
+            });
+        }
+
         // 普通行星
         this.planetKeys.forEach(key => {
             const planet = this.planets[key];
@@ -88,7 +117,7 @@ export class MaterialSwitcher {
             const data = PLANET_DATA[key];
             const newMaterial = new THREE.MeshStandardMaterial({
                 map: texture,
-                roughness: 0.8,
+                roughness: 0.4,
                 metalness: 0.1,
             });
 
@@ -106,6 +135,15 @@ export class MaterialSwitcher {
                 this.planets.sun.material.dispose();
                 this.planets.sun.material = sunMaterial;
             }
+
+            // 太阳光晕减半
+            let i = 0;
+            this.planets.sun.children.forEach(child => {
+                if (child.isSprite) {
+                    child.material.opacity = this.sunGlowOpacities[i] * 0.5;
+                    i++;
+                }
+            });
         }
 
         // 月球特殊处理
@@ -114,7 +152,7 @@ export class MaterialSwitcher {
             if (moonTexture) {
                 const moonMaterial = new THREE.MeshStandardMaterial({
                     map: moonTexture,
-                    roughness: 0.9,
+                    roughness: 0.4,
                     metalness: 0.0,
                 });
                 this.planets.moon.material.dispose();
@@ -132,6 +170,30 @@ export class MaterialSwitcher {
      * - 土星环 / 小行星带：不受影响（从未被修改）
      */
     switchToSolidMode() {
+        // 恢复行星光晕
+        this.planetKeys.forEach(key => {
+            const planet = this.planets[key];
+            if (planet && planet.userData.glow) {
+                planet.userData.glow.visible = true;
+            }
+        });
+        // 月球光晕
+        if (this.planets.moon) {
+            this.planets.moon.children.forEach(child => {
+                if (child.isSprite) child.visible = true;
+            });
+        }
+        // 恢复太阳光晕透明度
+        if (this.planets.sun) {
+            let i = 0;
+            this.planets.sun.children.forEach(child => {
+                if (child.isSprite) {
+                    child.material.opacity = this.sunGlowOpacities[i];
+                    i++;
+                }
+            });
+        }
+
         this.originalMaterials.forEach((material, key) => {
             const planet = this.planets[key];
             if (!planet) return;

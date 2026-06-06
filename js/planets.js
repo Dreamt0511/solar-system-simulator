@@ -20,7 +20,7 @@ export const PLANET_DATA = {
     },
     mercury: {
         name: '水星',
-        radius: 0.6,  // 增大以便可见
+        radius: 1.2,
         color: 0x8c7e6d,
         distance: 14,
         orbitalPeriod: 8,
@@ -67,11 +67,12 @@ export const PLANET_DATA = {
             mass: '5.972 × 10²⁴ kg',
             distance: '1 AU',
             period: '365.25 天',
-            moons: '月球'
+            moons: '月球',
+            quote: '你所爱的每一个人，你认识的每一个人，你听说过的每一个人，曾经存在过的每一个人，都在它上面度过他们的一生。所有的欢乐与痛苦，千万种宗教与意识形态，所有的猎人与强盗，所有的英雄与懦夫，每一个文明的缔造者与毁灭者，每一个国王与农夫，每一对年轻的恋人，每一位母亲与父亲，每一个充满希望的孩子，都在这里——一粒悬浮在阳光中的微尘。',
+            quoteSource: '卡尔·萨根《暗淡蓝点》'
         }
     },
     moon: {
-        name: '月球',
         radius: 0.4,  // 增大以便可见
         color: 0x999999,
         distance: 2.5,

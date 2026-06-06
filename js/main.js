@@ -9,6 +9,7 @@ import { Starfield } from './starfield.js';
 import { AsteroidBelt } from './asteroidBelt.js';
 import { TextureManager } from './textureManager.js';
 import { MaterialSwitcher } from './materialSwitcher.js';
+import { PlanetList } from './planetList.js';
 
 class SolarSystemApp {
     constructor() {
@@ -89,6 +90,12 @@ class SolarSystemApp {
 
         // 初始化后处理
         this.postProcessing = new PostProcessing(this.renderer, this.scene, this.camera);
+
+        // 初始化行星列表
+        this.planetList = new PlanetList(
+            { ...this.planets, asteroidBelt: this.asteroidBelt?.hitMesh },
+            this.cameraController
+        );
 
         this.uiManager.setLoadingProgress(90, '绑定事件...');
 

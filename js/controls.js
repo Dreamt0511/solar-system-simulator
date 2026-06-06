@@ -19,7 +19,7 @@ export class CameraController {
     setupControls() {
         this.controls.enableDamping = false;
         this.controls.screenSpacePanning = false;
-        this.controls.minDistance = 10;
+        this.controls.minDistance = 1.5;
         this.controls.maxDistance = 500;
         this.controls.enablePan = true;
         this.controls.enableZoom = true;

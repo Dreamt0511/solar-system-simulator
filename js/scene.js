@@ -32,7 +32,7 @@ export function createScene() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.2;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // 窗口大小调整
@@ -47,17 +47,26 @@ export function createScene() {
 
 export function createLighting(scene) {
     // 环境光（让背光面也能看到）
-    const ambientLight = new THREE.AmbientLight(0x404060, 0.8);
+    const ambientLight = new THREE.AmbientLight(0x8899cc, 2.0);
     scene.add(ambientLight);
 
     // 太阳光（点光源）
-    const sunLight = new THREE.PointLight(0xffffee, 2, 500);
+    const sunLight = new THREE.PointLight(0xffffff, 6, 500);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
 
     // 半球光（模拟太空环境）
-    const hemisphereLight = new THREE.HemisphereLight(0x444466, 0x222233, 0.5);
+    const hemisphereLight = new THREE.HemisphereLight(0x8899cc, 0x445577, 1.5);
     scene.add(hemisphereLight);
 
-    return { ambientLight, sunLight, hemisphereLight };
+    // 补充方向光 — 从侧面照亮纹理细节
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.6);
+    dirLight1.position.set(100, 50, 100);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dirLight2.position.set(-100, -30, -80);
+    scene.add(dirLight2);
+
+    return { ambientLight, sunLight, hemisphereLight, dirLight1, dirLight2 };
 }

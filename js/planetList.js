@@ -1,0 +1,75 @@
+const LIST_ITEMS = [
+  { key: 'sun', label: '太阳', color: '#ff7a1f' },
+  { key: 'mercury', label: '水星', color: '#8c7e6d' },
+  { key: 'venus', label: '金星', color: '#e6c88a' },
+  { key: 'earth', label: '地球', color: '#2266cc' },
+  { key: 'moon', label: '月球', color: '#999999' },
+  { key: 'mars', label: '火星', color: '#b45a32' },
+  { key: 'jupiter', label: '木星', color: '#c8a882' },
+  { key: 'saturn', label: '土星', color: '#ead6a6' },
+  { key: 'uranus', label: '天王星', color: '#72b5c4' },
+  { key: 'neptune', label: '海王星', color: '#3f54ba' },
+  { key: 'asteroidBelt', label: '小行星带', color: '#9a8468' },
+];
+
+export class PlanetList {
+  constructor(targets, cameraController) {
+    this.targets = targets;
+    this.cameraController = cameraController;
+    this.isExpanded = false;
+    this.selectedKey = null;
+
+    this.toggleBtn = document.getElementById('planet-list-toggle');
+    this.panel = document.getElementById('planet-list-panel');
+    this.itemsContainer = document.getElementById('planet-list-items');
+
+    this.render();
+    this.bindEvents();
+  }
+
+  render() {
+    LIST_ITEMS.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'planet-list-item';
+      el.dataset.key = item.key;
+      el.innerHTML = [
+        '<span class="planet-list-dot" style="background:' + item.color + '"></span>',
+        '<span class="planet-list-label">' + item.label + '</span>'
+      ].join('');
+      this.itemsContainer.appendChild(el);
+    });
+  }
+
+  bindEvents() {
+    this.toggleBtn.addEventListener('click', () => this.toggle());
+
+    this.itemsContainer.addEventListener('click', (e) => {
+      const item = e.target.closest('.planet-list-item');
+      if (!item) return;
+      this.select(item.dataset.key);
+    });
+  }
+
+  toggle() {
+    this.isExpanded = !this.isExpanded;
+    this.panel.classList.toggle('hidden', !this.isExpanded);
+    this.toggleBtn.classList.toggle('active', this.isExpanded);
+  }
+
+  select(key) {
+    this.selectedKey = key;
+
+    this.itemsContainer.querySelectorAll('.planet-list-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.key === key);
+    });
+
+    const target = this.targets[key];
+    if (target) {
+      this.cameraController.selectPlanet(target);
+    }
+
+    if (window.innerWidth < 768) {
+      this.toggle();
+    }
+  }
+}
