@@ -16,8 +16,7 @@ export class AsteroidBelt {
         const material = new THREE.MeshBasicMaterial({
             color: 0x9a8468
         });
-        const mesh = new THREE.InstancedMesh(geometry, material, this.count);
-        const dummy = new THREE.Object3D();
+        const mesh = new THREE.Group();
 
         for (let i = 0; i < this.count; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -25,26 +24,26 @@ export class AsteroidBelt {
             const radius = 40 + band * 12 + (Math.random() - 0.5) * 1.8;
             const height = (Math.random() - 0.5) * 2.2;
             const size = 0.35 + Math.random() * 0.75;
+            const asteroid = new THREE.Mesh(geometry, material);
 
-            dummy.position.set(
+            asteroid.position.set(
                 Math.sin(angle) * radius,
                 height,
                 Math.cos(angle) * radius
             );
-            dummy.rotation.set(
+            asteroid.rotation.set(
                 Math.random() * Math.PI,
                 Math.random() * Math.PI,
                 Math.random() * Math.PI
             );
-            dummy.scale.set(size * 1.4, size * (0.6 + Math.random() * 0.8), size);
-            dummy.updateMatrix();
+            asteroid.scale.set(size * 1.4, size * (0.6 + Math.random() * 0.8), size);
 
-            mesh.setMatrixAt(i, dummy.matrix);
+            mesh.add(asteroid);
         }
 
-        mesh.instanceMatrix.needsUpdate = true;
-
         this.mesh = mesh;
+        this.geometry = geometry;
+        this.material = material;
         this.group.add(mesh);
 
         // 碰撞环：不可见但可被射线检测，覆盖整个小行星带区域
@@ -88,8 +87,12 @@ export class AsteroidBelt {
             this.hitMesh.material.dispose();
         }
         this.scene.remove(this.group);
-        this.mesh.geometry.dispose();
-        this.mesh.material.dispose();
+        if (this.geometry) {
+            this.geometry.dispose();
+        }
+        if (this.material) {
+            this.material.dispose();
+        }
         this.mesh = null;
     }
 }
