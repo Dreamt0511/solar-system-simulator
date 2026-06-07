@@ -136,11 +136,11 @@ export class MaterialSwitcher {
                 this.planets.sun.material = sunMaterial;
             }
 
-            // 太阳光晕减半
+            // 太阳光晕缩小
             let i = 0;
             this.planets.sun.children.forEach(child => {
                 if (child.isSprite) {
-                    child.material.opacity = this.sunGlowOpacities[i] * 0.5;
+                    child.material.opacity = this.sunGlowOpacities[i] * 0.25;
                     i++;
                 }
             });

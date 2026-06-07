@@ -106,7 +106,7 @@ html, body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
+    padding: 8px 12px;
     background: rgba(255, 255, 255, 0.05);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -122,7 +122,7 @@ html, body {
     color: #888;
     font-size: 1.2rem;
     cursor: pointer;
-    padding: 0;
+    padding: 4px 8px;
     line-height: 1;
     transition: color 0.2s;
 }
@@ -132,11 +132,11 @@ html, body {
 }
 
 .panel-content {
-    padding: 10px 14px;
+    padding: 8px 12px;
 }
 
 .control-group {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .control-group:last-child {
@@ -183,14 +183,14 @@ html, body {
 }
 
 .control-group button {
-    padding: 10px 20px;
-    margin-right: 10px;
-    margin-bottom: 10px;
+    padding: 7px 14px;
+    margin-right: 8px;
+    margin-bottom: 6px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
     color: #fff;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -278,11 +278,54 @@ html, body {
     }
 
     #controls-panel {
-        bottom: 80px;
-        right: 20px;
-        width: 250px;
-        max-width: calc(100vw - 40px);
-        max-height: calc(100vh - 40px);
+        bottom: 60px;
+        right: 15px;
+        width: 230px;
+        max-height: calc(100vh - 70px);
+    }
+}
+
+/* 手机横屏 */
+@media (orientation: landscape) and (max-height: 500px) {
+    #controls-panel {
+        bottom: 55px;
+        right: 10px;
+        width: 210px;
+        max-height: calc(100vh - 65px);
+    }
+
+    .settings-icon {
+        bottom: 8px;
+        right: 8px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .panel-header {
+        padding: 6px 10px;
+    }
+
+    .panel-content {
+        padding: 6px 10px;
+    }
+
+    .control-group {
+        margin-bottom: 8px;
+    }
+
+    .control-group label {
+        font-size: 0.72rem;
+        margin-bottom: 3px;
+    }
+
+    .control-group button {
+        padding: 5px 10px;
+        font-size: 0.72rem;
+    }
+
+    #close-panel {
+        padding: 4px 8px;
+        font-size: 1.2rem;
     }
 }
 
@@ -355,10 +398,12 @@ html, body {
 /* 控制面板定位 */
 #controls-panel {
     position: fixed;
-    bottom: 80px;
+    bottom: 70px;
     right: 20px;
-    width: 300px;
+    width: 260px;
     max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
     z-index: 1001;
     background: rgba(0, 0, 0, 0.8);
     border-radius: 12px;
@@ -367,14 +412,15 @@ html, body {
 }
 
 /* 纹理开关按钮 */
-#texture-toggle {
-    padding: 8px 16px;
+#texture-toggle,
+#starfield-toggle {
+    padding: 6px 10px;
     border: none;
     border-radius: 6px;
-    background: #4CAF50;
+    background: rgba(255, 255, 255, 0.1);
     color: white;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     transition: all 0.3s ease;
 }
 
@@ -383,8 +429,9 @@ html, body {
     cursor: not-allowed;
 }
 
-#texture-toggle:not(:disabled):hover {
-    background: #45a049;
+#texture-toggle:not(:disabled):hover,
+#starfield-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* 行星列表 */

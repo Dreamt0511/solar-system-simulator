@@ -10,6 +10,7 @@ import { AsteroidBelt } from './asteroidBelt.js';
 import { TextureManager } from './textureManager.js';
 import { MaterialSwitcher } from './materialSwitcher.js';
 import { PlanetList } from './planetList.js';
+import { StarfieldBackground } from './starfieldBackground.js';
 
 class SolarSystemApp {
     constructor() {
@@ -25,6 +26,7 @@ class SolarSystemApp {
         this.uiManager = null;
         this.textureManager = null;
         this.materialSwitcher = null;
+        this.starfieldBackground = null;
 
         this.clock = new THREE.Clock();
         this.simulationTime = 0;
@@ -64,6 +66,7 @@ class SolarSystemApp {
         // 初始化纹理系统（后台预加载）
         this.textureManager = new TextureManager();
         this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache);
+        this.starfieldBackground = new StarfieldBackground(this.scene);
         this.texturesLoaded = false;
         this.textureLoadingPromise = this.textureManager.loadAll().then(() => {
             this.texturesLoaded = true;
@@ -156,19 +159,32 @@ class SolarSystemApp {
 
         // 纹理开关事件（复用后台预加载的 promise）
         const textureBtn = document.getElementById('texture-toggle');
+        const starfieldBtn = document.getElementById('starfield-toggle');
+
         if (textureBtn) {
             textureBtn.addEventListener('click', async () => {
                 if (!this.materialSwitcher) return;
 
                 if (!this.texturesLoaded) {
                     textureBtn.disabled = true;
-                    textureBtn.textContent = '加载纹理中...';
+                    textureBtn.textContent = '加载中...';
                     await this.textureLoadingPromise;
                     textureBtn.disabled = false;
                 }
 
                 this.materialSwitcher.toggle();
-                textureBtn.textContent = this.materialSwitcher.isTextureMode ? '关闭' : '开启';
+                textureBtn.textContent = '真实纹理';
+                textureBtn.style.background = this.materialSwitcher.isTextureMode ? '#4CAF50' : '';
+            });
+        }
+
+        if (starfieldBtn) {
+            starfieldBtn.addEventListener('click', async () => {
+                if (!this.starfieldBackground) return;
+
+                const active = await this.starfieldBackground.toggle();
+                starfieldBtn.textContent = '美丽星空';
+                starfieldBtn.style.background = active ? '#4CAF50' : '';
             });
         }
     }
