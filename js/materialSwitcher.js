@@ -114,9 +114,9 @@ export class MaterialSwitcher {
             const texture = this.textureMap.get(key);
             if (!texture) return;
 
-            const data = PLANET_DATA[key];
             const newMaterial = new THREE.MeshStandardMaterial({
                 map: texture,
+                color: 0xffffff,
                 roughness: 0.4,
                 metalness: 0.1,
             });
@@ -150,10 +150,8 @@ export class MaterialSwitcher {
         if (this.planets.moon) {
             const moonTexture = this.textureMap.get('moon');
             if (moonTexture) {
-                const moonMaterial = new THREE.MeshStandardMaterial({
+                const moonMaterial = new THREE.MeshBasicMaterial({
                     map: moonTexture,
-                    roughness: 0.4,
-                    metalness: 0.0,
                 });
                 this.planets.moon.material.dispose();
                 this.planets.moon.material = moonMaterial;

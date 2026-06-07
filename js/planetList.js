@@ -48,6 +48,23 @@ export class PlanetList {
       if (!item) return;
       this.select(item.dataset.key);
     });
+
+    // 手动点击3D行星时同步列表高亮
+    window.addEventListener('planetSelected', (e) => {
+      const key = e.detail.key;
+      if (key) this.highlight(key);
+    });
+
+    window.addEventListener('planetDeselected', () => {
+      this.highlight(null);
+    });
+  }
+
+  highlight(key) {
+    this.selectedKey = key;
+    this.itemsContainer.querySelectorAll('.planet-list-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.key === key);
+    });
   }
 
   toggle() {

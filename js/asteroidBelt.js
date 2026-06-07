@@ -58,6 +58,7 @@ export class AsteroidBelt {
         hitMesh.rotation.x = Math.PI / 2;
         hitMesh.userData = {
             type: 'asteroidBelt',
+            key: 'asteroidBelt',
             data: {
                 name: '小行星带',
                 info: {

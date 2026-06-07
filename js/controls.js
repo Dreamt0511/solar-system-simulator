@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { KeplerOrbit } from './orbital.js';
 
 export class CameraController {
     constructor(camera, renderer, scene) {
@@ -11,6 +12,9 @@ export class CameraController {
         this.mouse = new THREE.Vector2();
         this.selectedPlanet = null;
         this.isAnimating = false;
+        this.simulationTime = 0;
+        this.timeSpeed = 1;
+        this.isPaused = false;
 
         this.setupControls();
         this.setupEventListeners();
@@ -105,6 +109,7 @@ export class CameraController {
         const event = new CustomEvent('planetSelected', {
             detail: {
                 name: planet.userData.data.name,
+                key: planet.userData.key,
                 data: planet.userData.data,
                 position: planet.getWorldPosition(new THREE.Vector3())
             }
@@ -125,7 +130,7 @@ export class CameraController {
         if (this.isAnimating) return;
         this.isAnimating = true;
 
-        // 小行星带特殊处理：飞到带中间高度俯瞰
+        // 小行星带特殊处理
         if (planet.userData && planet.userData.type === 'asteroidBelt') {
             const beltCenter = new THREE.Vector3(0, 0, 0);
             const cameraTarget = new THREE.Vector3(0, 80, 100);
@@ -133,29 +138,95 @@ export class CameraController {
             return;
         }
 
-        const targetPosition = planet.getWorldPosition(new THREE.Vector3());
-        const planetRadius = planet.geometry ? planet.geometry.parameters.radius : 5;
+        // 太阳特殊处理（没有轨道数据）
+        if (planet.userData && planet.userData.type === 'sun') {
+            const sunPos = planet.getWorldPosition(new THREE.Vector3(0, 0, 0));
+            const r = planet.geometry.parameters.radius;
+            const cameraTarget = new THREE.Vector3(r * 3, r * 2, r * 3);
+            this.animateFly(cameraTarget, sunPos, duration, () => {
+                window.dispatchEvent(new CustomEvent('cameraArrived', {
+                    detail: { name: '太阳', data: planet.userData.data }
+                }));
+            });
+            return;
+        }
 
-        // 轨道="地面"（XZ平面），相机像人站在地面上：
-        //   身体垂直（up=0,1,0），视线基本水平微微向下看行星
-        //   → 轨道在视野下方展开成椭圆
+        // 月球特殊处理（绕地球旋转，需要同时预测地球和月球位置）
+        if (planet.userData && planet.userData.type === 'moon') {
+            const moonData = planet.userData.data;
+            const earthData = { distance: 28, orbitalPeriod: 25, orbitalEccentricity: 0.2, orbitalInclination: 0 };
+            const futureSimTime = this.isPaused
+                ? (this.simulationTime || 0)
+                : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
+
+            // 预测地球位置
+            const earthOrbit = new KeplerOrbit(earthData.distance, earthData.orbitalEccentricity, earthData.orbitalInclination);
+            const earthTheta = earthOrbit.getTrueAnomaly(futureSimTime, earthData.orbitalPeriod);
+            const earthPos = earthOrbit.getPosition3D(earthTheta);
+
+            // 预测月球相对地球位置
+            const moonOrbit = new KeplerOrbit(moonData.distance, moonData.orbitalEccentricity, 0);
+            const moonTheta = moonOrbit.getTrueAnomaly(futureSimTime, moonData.orbitalPeriod);
+            const moonRel = moonOrbit.getPosition3D(moonTheta);
+
+            // 月球世界坐标 = 地球位置 + 月球相对偏移
+            const moonPos = new THREE.Vector3(
+                earthPos.x + moonRel.x,
+                earthPos.y + moonRel.y,
+                earthPos.z + moonRel.z
+            );
+
+            const r = planet.geometry ? planet.geometry.parameters.radius : 0.4;
+            const dist = r * 10;
+            const cameraAngle = Math.atan2(moonPos.x, moonPos.z);
+            const cameraTarget = new THREE.Vector3(
+                moonPos.x + dist * Math.sin(cameraAngle),
+                moonPos.y + dist * 0.25,
+                moonPos.z + dist * Math.cos(cameraAngle)
+            );
+            this.animateFly(cameraTarget, moonPos, duration, () => {
+                window.dispatchEvent(new CustomEvent('cameraArrived', {
+                    detail: { name: '月球', data: moonData }
+                }));
+            });
+            return;
+        }
+
+        // 计算目标位置：运动时预判，暂停时直接到达当前点
+        const data = planet.userData.data;
+        const orbit = new KeplerOrbit(data.distance, data.orbitalEccentricity, data.orbitalInclination);
+        const futureSimTime = this.isPaused
+            ? (this.simulationTime || 0)
+            : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
+        const futureTheta = orbit.getTrueAnomaly(futureSimTime, data.orbitalPeriod);
+        const futurePos = orbit.getPosition3D(futureTheta);
+        const targetPosition = new THREE.Vector3(futurePos.x, futurePos.y, futurePos.z);
+
+        const planetRadius = planet.geometry ? planet.geometry.parameters.radius : 5;
         const dist = planetRadius * 6;
-        const depressionAngle = 15 * (Math.PI / 180); // 15度俯角，像人站着往前看
+        const depressionAngle = 15 * (Math.PI / 180);
         const tanAngle = Math.tan(depressionAngle);
-        // 相机在行星的径向方向后退 dist，同时抬升使视线以15°俯角看向行星
         const cameraAngle = Math.atan2(targetPosition.x, targetPosition.z);
 
         const cameraTarget = new THREE.Vector3(
             targetPosition.x + dist * Math.sin(cameraAngle),
-            targetPosition.y + dist * tanAngle + planetRadius, // 略高于行星，保证不穿地
+            targetPosition.y + dist * tanAngle + planetRadius,
             targetPosition.z + dist * Math.cos(cameraAngle)
         );
 
-        // 保存初始位置
-        this.animateFly(cameraTarget, targetPosition, duration);
+        this.animateFly(cameraTarget, targetPosition, duration, () => {
+            if (planet.userData && planet.userData.type === 'planet') {
+                window.dispatchEvent(new CustomEvent('cameraArrived', {
+                    detail: {
+                        name: planet.userData.data.name,
+                        data: planet.userData.data
+                    }
+                }));
+            }
+        });
     }
 
-    animateFly(cameraTarget, lookAtTarget, duration) {
+    animateFly(cameraTarget, lookAtTarget, duration, onComplete) {
         const startPosition = this.camera.position.clone();
         const startTarget = this.controls.target.clone();
         const startTime = Date.now();
@@ -174,6 +245,7 @@ export class CameraController {
                 requestAnimationFrame(animate);
             } else {
                 this.isAnimating = false;
+                if (onComplete) onComplete();
             }
         };
 

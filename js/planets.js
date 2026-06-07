@@ -109,6 +109,7 @@ export const PLANET_DATA = {
         name: '木星',
         radius: 3.5,  // 缩小以便与太阳区分
         color: 0xc8a882,
+        glowIntensity: 1.0,
         distance: 55,
         orbitalPeriod: 80,
         rotationSpeed: 0.008,
@@ -285,7 +286,7 @@ export function createPlanet(scene, planetKey) {
     // 添加光晕 - 更亮
     const glowMaterial = new THREE.SpriteMaterial({
         map: planetGlowTexture,
-        color: new THREE.Color(data.color).multiplyScalar(1.5),
+        color: new THREE.Color(data.color).multiplyScalar(data.glowIntensity || 1.5),
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,

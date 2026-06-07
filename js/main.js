@@ -61,21 +61,23 @@ class SolarSystemApp {
         // 创建行星
         this.planets = createAllPlanets(this.scene);
 
-        // 初始化纹理系统
+        // 初始化纹理系统（后台预加载）
         this.textureManager = new TextureManager();
         this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache);
-
-        // 加载纹理
-        this.textureManager.loadAll((loaded, total) => {
-            this.uiManager.setLoadingProgress(50 + (loaded / total) * 30, `加载纹理: ${loaded}/${total}`);
-        }).then(() => {
-            // 纹理加载完成，启用开关
-            const textureBtn = document.getElementById('texture-toggle');
-            if (textureBtn) {
-                textureBtn.disabled = false;
-                textureBtn.textContent = '开启';
-            }
+        this.texturesLoaded = false;
+        this.textureLoadingPromise = this.textureManager.loadAll().then(() => {
+            this.texturesLoaded = true;
+            console.log('纹理全部加载完成');
+        }).catch((err) => {
+            console.error('纹理加载失败:', err);
         });
+
+        // 纹理按钮立即可用
+        const textureBtn = document.getElementById('texture-toggle');
+        if (textureBtn) {
+            textureBtn.disabled = false;
+            textureBtn.textContent = '开启';
+        }
 
         this.uiManager.setLoadingProgress(70, '计算轨道...');
 
@@ -152,14 +154,21 @@ class SolarSystemApp {
             });
         }
 
-        // 纹理开关事件
+        // 纹理开关事件（复用后台预加载的 promise）
         const textureBtn = document.getElementById('texture-toggle');
         if (textureBtn) {
-            textureBtn.addEventListener('click', () => {
-                if (this.materialSwitcher) {
-                    this.materialSwitcher.toggle();
-                    textureBtn.textContent = this.materialSwitcher.isTextureMode ? '关闭' : '开启';
+            textureBtn.addEventListener('click', async () => {
+                if (!this.materialSwitcher) return;
+
+                if (!this.texturesLoaded) {
+                    textureBtn.disabled = true;
+                    textureBtn.textContent = '加载纹理中...';
+                    await this.textureLoadingPromise;
+                    textureBtn.disabled = false;
                 }
+
+                this.materialSwitcher.toggle();
+                textureBtn.textContent = this.materialSwitcher.isTextureMode ? '关闭' : '开启';
             });
         }
     }
@@ -177,6 +186,12 @@ class SolarSystemApp {
         // 更新行星位置
         this.updatePlanets();
 
+        // 更新月球 - 绕地球旋转（受暂停控制）
+        if (!this.isPaused && this.planets.moon && this.planets.moon.userData.orbitGroup) {
+            const moonData = PLANET_DATA.moon;
+            this.planets.moon.userData.orbitGroup.rotation.y += (2 * Math.PI) / (moonData.orbitalPeriod * 60);
+        }
+
         // 更新星空闪烁
         if (this.starfield) {
             this.starfield.update(this.simulationTime);
@@ -192,7 +207,12 @@ class SolarSystemApp {
         }
 
         // 更新相机控制器
-        this.cameraController.update();
+        if (this.cameraController) {
+            this.cameraController.simulationTime = this.simulationTime;
+            this.cameraController.timeSpeed = this.timeSpeed;
+            this.cameraController.isPaused = this.isPaused;
+            this.cameraController.update();
+        }
 
         // 更新土星环
         this.updateRings();
@@ -210,13 +230,6 @@ class SolarSystemApp {
                 updatePlanetPosition(planet, this.simulationTime, PLANET_DATA);
             }
         });
-
-        // 更新月球 - 绕地球旋转
-        if (this.planets.moon && this.planets.moon.userData.orbitGroup) {
-            const moonData = PLANET_DATA.moon;
-            // 月球轨道容器旋转
-            this.planets.moon.userData.orbitGroup.rotation.y += (2 * Math.PI) / (moonData.orbitalPeriod * 60);
-        }
     }
 
     updateRings() {

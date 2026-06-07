@@ -31,6 +31,13 @@ export class UIManager {
             showControls: false
         };
 
+        this.quoteTimeoutId = null;
+
+        // 地球音乐
+        this.earthAudio = new Audio('music/earth.mp3');
+        this.earthAudio.preload = 'auto';
+        this.earthAudio.loop = true;
+
         this.callbacks = {};
 
         this.setupEventListeners();
@@ -84,6 +91,24 @@ export class UIManager {
 
         window.addEventListener('planetDeselected', () => {
             this.hideInfoPanel();
+        });
+
+        // 相机到达后，延迟1.5秒后同时显示引文和播放音乐
+        window.addEventListener('cameraArrived', (e) => {
+            const { data } = e.detail;
+            if (data.info && data.info.quote) {
+                if (this.quoteTimeoutId) {
+                    clearTimeout(this.quoteTimeoutId);
+                }
+                this.quoteTimeoutId = setTimeout(() => {
+                    this.showQuoteOverlay(data.info.quote, data.info.quoteSource);
+                    if (this.earthAudio.paused) {
+                        this.earthAudio.currentTime = 0;
+                        this.earthAudio.play().catch(() => {});
+                    }
+                    this.quoteTimeoutId = null;
+                }, 1500);
+            }
         });
 
         // 监听屏幕方向变化
@@ -183,13 +208,6 @@ export class UIManager {
         this.elements.planetMoons.textContent = data.info.moons;
 
         this.elements.infoPanel.classList.remove('hidden');
-
-        // 如果有专属引文则显示弹窗
-        if (data.info.quote) {
-            setTimeout(() => {
-                this.showQuoteOverlay(data.info.quote, data.info.quoteSource);
-            }, 600);
-        }
     }
 
     // 隐藏信息面板
@@ -203,6 +221,11 @@ export class UIManager {
     // 显示引文弹窗
     showQuoteOverlay(text, source) {
         if (!this.elements.quoteOverlay || !this.elements.quoteText || !this.elements.quoteAuthor) return;
+        // 清除可能残留的延迟
+        if (this.quoteTimeoutId) {
+            clearTimeout(this.quoteTimeoutId);
+            this.quoteTimeoutId = null;
+        }
         this.elements.quoteText.textContent = text;
         this.elements.quoteAuthor.textContent = source;
         this.elements.quoteOverlay.classList.remove('hidden');
@@ -210,9 +233,18 @@ export class UIManager {
 
     // 隐藏引文弹窗
     hideQuoteOverlay() {
+        if (this.quoteTimeoutId) {
+            clearTimeout(this.quoteTimeoutId);
+            this.quoteTimeoutId = null;
+        }
         if (this.elements.quoteOverlay) {
             this.elements.quoteOverlay.classList.add('hidden');
         }
+        // 暂停地球音乐并重置
+        try {
+            this.earthAudio.pause();
+            this.earthAudio.currentTime = 0;
+        } catch (e) {}
     }
 
     // 切换控制面板
