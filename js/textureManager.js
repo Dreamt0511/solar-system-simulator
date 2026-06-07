@@ -3,7 +3,8 @@ import * as THREE from 'three';
 // 行星列表
 const PLANET_KEYS = [
   'sun', 'mercury', 'venus', 'earth', 'mars',
-  'jupiter', 'saturn', 'uranus', 'neptune', 'moon'
+  'jupiter', 'saturn', 'uranus', 'neptune', 'moon',
+  'pluto', 'ceres', 'io', 'europa', 'ganymede', 'callisto', 'titan', 'halley'
 ];
 
 // 纹理路径模板

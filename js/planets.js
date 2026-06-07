@@ -1,15 +1,19 @@
 import * as THREE from 'three';
 import { atmosphereVertexShader, atmosphereFragmentShader } from './shaders.js';
 
-// 行星数据（按真实比例缩放，地球半径 = 1）
-// 实际半径比例：太阳109 > 木星11 > 土星9.1 > 天王星4 > 海王星3.9 > 地球1 > 金星0.95 > 火星0.53 > 水星0.38 > 月球0.27
-// orbitalPeriod 单位为"秒"，数值越大运行越慢
+// 行星数据
+// 视觉半径（视觉可辨大小，非真实比例——若按真实比例木星会是地球的11倍）
+// 实际半径比例参考：太阳109 > 木星11 > 土星9.1 > 天王星4 > 海王星3.9 > 地球1 > 金星0.95 > 火星0.53 > 水星0.38 > 月球0.27
+// 轨道距离：基于真实 AU 值按指数 0.4 缩放（Neptune=100），兼顾视觉与比例
+// 离心率/倾角/自转周期：NASA/JPL 真实数据
+// orbitalPeriod：按开普勒第三定律 P²∝a³ 计算（Earth=25s）
+// rotationSpeed：基于真实自转周期相对于地球的比例（Earth=0.004）
 export const PLANET_DATA = {
     sun: {
         name: '太阳',
-        radius: 10,  // 最大，远超其他行星
+        radius: 10,
         color: 0xff7a1f,
-        rotationSpeed: 0.0005,
+        rotationSpeed: 0.00016, // 25.05d 自转
         info: {
             radius: '696,340 km',
             mass: '1.989 × 10³⁰ kg',
@@ -22,11 +26,12 @@ export const PLANET_DATA = {
         name: '水星',
         radius: 1.2,
         color: 0x8c7e6d,
-        distance: 14,
-        orbitalPeriod: 8,
-        rotationSpeed: 0.002,
-        orbitalEccentricity: 0.3,  // 增大离心率让椭圆更明显
-        orbitalInclination: 7.0,
+        distance: 17.5,
+        orbitalPeriod: 14,
+        rotationSpeed: 0.00007, // 58.65d 自转
+        orbitalEccentricity: 0.206,
+        orbitalInclination: 7.00,
+        initialMeanAnomaly: 80.14,
         info: {
             radius: '2,439 km',
             mass: '3.301 × 10²³ kg',
@@ -37,13 +42,14 @@ export const PLANET_DATA = {
     },
     venus: {
         name: '金星',
-        radius: 1.2,  // 增大以便可见
+        radius: 1.2,
         color: 0xe6c88a,
-        distance: 20,
-        orbitalPeriod: 15,
-        rotationSpeed: 0.001,
-        orbitalEccentricity: 0.15,
-        orbitalInclination: 3.4,
+        distance: 22.6,
+        orbitalPeriod: 21,
+        rotationSpeed: -0.00002, // 243d 逆向自转
+        orbitalEccentricity: 0.007,
+        orbitalInclination: 3.39,
+        initialMeanAnomaly: 36.69,
         info: {
             radius: '6,051 km',
             mass: '4.867 × 10²⁴ kg',
@@ -54,13 +60,14 @@ export const PLANET_DATA = {
     },
     earth: {
         name: '地球',
-        radius: 1.3,  // 增大以便可见
+        radius: 1.3,
         color: 0x2266cc,
-        distance: 28,
+        distance: 25.7,
         orbitalPeriod: 25,
-        rotationSpeed: 0.003,
-        orbitalEccentricity: 0.2,  // 增大离心率
-        orbitalInclination: 0.0,
+        rotationSpeed: 0.004, // 24h 自转（基准）
+        orbitalEccentricity: 0.017,
+        orbitalInclination: 0.00,
+        initialMeanAnomaly: 151.23,
         moons: ['moon'],
         info: {
             radius: '6,371 km',
@@ -73,12 +80,13 @@ export const PLANET_DATA = {
         }
     },
     moon: {
-        radius: 0.4,  // 增大以便可见
+        radius: 0.4,
         color: 0x999999,
         distance: 2.5,
         orbitalPeriod: 2.7,
-        rotationSpeed: 0.001,
-        orbitalEccentricity: 0.15,
+        rotationSpeed: 0.00015, // 27.3d 潮汐锁定
+        orbitalEccentricity: 0.055,
+        initialMeanAnomaly: 276.40,
         parent: 'earth',
         info: {
             radius: '1,737 km',
@@ -90,13 +98,14 @@ export const PLANET_DATA = {
     },
     mars: {
         name: '火星',
-        radius: 1,  // 增大以便可见
+        radius: 1.0,
         color: 0xb45a32,
-        distance: 35,
-        orbitalPeriod: 40,
-        rotationSpeed: 0.003,
-        orbitalEccentricity: 0.25,
+        distance: 30.4,
+        orbitalPeriod: 32,
+        rotationSpeed: 0.0039, // 24.6h 自转
+        orbitalEccentricity: 0.093,
         orbitalInclination: 1.85,
+        initialMeanAnomaly: 38.11,
         info: {
             radius: '3,389 km',
             mass: '6.417 × 10²³ kg',
@@ -107,31 +116,33 @@ export const PLANET_DATA = {
     },
     jupiter: {
         name: '木星',
-        radius: 3.5,  // 缩小以便与太阳区分
+        radius: 3.5,
         color: 0xc8a882,
         glowIntensity: 1.0,
-        distance: 55,
-        orbitalPeriod: 80,
-        rotationSpeed: 0.008,
-        orbitalEccentricity: 0.2,
-        orbitalInclination: 1.3,
+        distance: 49.9,
+        orbitalPeriod: 68,
+        rotationSpeed: 0.0096, // 9.9h 自转（最快）
+        orbitalEccentricity: 0.048,
+        orbitalInclination: 1.31,
+        initialMeanAnomaly: 102.12,
         info: {
             radius: '69,911 km',
             mass: '1.898 × 10²⁷ kg',
-            distance: '5.2 AU',
+            distance: '5.20 AU',
             period: '4,333 天',
             moons: '95颗已知卫星'
         }
     },
     saturn: {
         name: '土星',
-        radius: 3,  // 缩小以便与太阳区分
+        radius: 3.0,
         color: 0xead6a6,
-        distance: 70,
-        orbitalPeriod: 120,
-        rotationSpeed: 0.007,
-        orbitalEccentricity: 0.22,
+        distance: 64.0,
+        orbitalPeriod: 98,
+        rotationSpeed: 0.0090, // 10.7h 自转
+        orbitalEccentricity: 0.055, // JPL: 0.0554
         orbitalInclination: 2.49,
+        initialMeanAnomaly: 280.84,
         hasRings: true,
         info: {
             radius: '58,232 km',
@@ -143,13 +154,14 @@ export const PLANET_DATA = {
     },
     uranus: {
         name: '天王星',
-        radius: 2,  // 适中
+        radius: 2.0,
         color: 0x72b5c4,
-        distance: 85,
-        orbitalPeriod: 180,
-        rotationSpeed: 0.005,
-        orbitalEccentricity: 0.18,
+        distance: 84.9,
+        orbitalPeriod: 150,
+        rotationSpeed: 0.0056, // 17.2h 自转
+        orbitalEccentricity: 0.047,
         orbitalInclination: 0.77,
+        initialMeanAnomaly: 260.52,
         info: {
             radius: '25,362 km',
             mass: '8.6813 × 10²⁵ kg',
@@ -160,13 +172,14 @@ export const PLANET_DATA = {
     },
     neptune: {
         name: '海王星',
-        radius: 1.9,  // 适中
+        radius: 1.9,
         color: 0x3f54ba,
-        distance: 100,
-        orbitalPeriod: 240,
-        rotationSpeed: 0.004,
-        orbitalEccentricity: 0.15,
+        distance: 100.0,
+        orbitalPeriod: 192,
+        rotationSpeed: 0.0059, // 16.1h 自转
+        orbitalEccentricity: 0.010, // JPL: 0.0102
         orbitalInclination: 1.77,
+        initialMeanAnomaly: 312.37,
         info: {
             radius: '24,622 km',
             mass: '1.024 × 10²⁶ kg',

@@ -75,6 +75,9 @@ export class PostProcessing {
         this.toneMappingPass.uniforms.exposure.value = 1.0;
         this.composer.addPass(this.toneMappingPass);
 
+        // 标记最终 pass 输出到屏幕，否则 canvas 为空
+        this.toneMappingPass.renderToScreen = true;
+
         // 处理窗口大小变化
         window.addEventListener('resize', () => {
             this.onWindowResize();
@@ -107,5 +110,18 @@ export class PostProcessing {
 
     render() {
         this.composer.render();
+    }
+
+    /**
+     * 截图：等渲染完成后从 canvas 读取像素
+     * @param {HTMLCanvasElement} canvas
+     * @returns {string} dataURL
+     */
+    captureToDataURL(canvas) {
+        // 确保当前帧渲染到 canvas
+        this.toneMappingPass.renderToScreen = true;
+        this.composer.render();
+        // 读取像素
+        return canvas.toDataURL('image/png');
     }
 }

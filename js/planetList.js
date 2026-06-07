@@ -5,11 +5,14 @@ const LIST_ITEMS = [
   { key: 'earth', label: '地球', color: '#2266cc' },
   { key: 'moon', label: '月球', color: '#999999' },
   { key: 'mars', label: '火星', color: '#b45a32' },
+  { key: 'ceres', label: '谷神星', color: '#7a8a9a' },
   { key: 'jupiter', label: '木星', color: '#c8a882' },
   { key: 'saturn', label: '土星', color: '#ead6a6' },
   { key: 'uranus', label: '天王星', color: '#72b5c4' },
   { key: 'neptune', label: '海王星', color: '#3f54ba' },
+  { key: 'pluto', label: '冥王星', color: '#bfb0a0' },
   { key: 'asteroidBelt', label: '小行星带', color: '#9a8468' },
+  { key: 'halley', label: '哈雷彗星', color: '#66aadd' },
 ];
 
 export class PlanetList {

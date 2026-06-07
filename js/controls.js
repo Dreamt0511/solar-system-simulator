@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KeplerOrbit } from './orbital.js';
+import { PLANET_DATA } from './planets.js';
 
 export class CameraController {
     constructor(camera, renderer, scene) {
@@ -65,7 +66,7 @@ export class CameraController {
         // 获取所有可点击对象
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet')) {
                 clickableObjects.push(child);
             }
         });
@@ -88,7 +89,7 @@ export class CameraController {
 
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet')) {
                 clickableObjects.push(child);
             }
         });
@@ -154,19 +155,21 @@ export class CameraController {
         // 月球特殊处理（绕地球旋转，需要同时预测地球和月球位置）
         if (planet.userData && planet.userData.type === 'moon') {
             const moonData = planet.userData.data;
-            const earthData = { distance: 28, orbitalPeriod: 25, orbitalEccentricity: 0.2, orbitalInclination: 0 };
+            const earthData = PLANET_DATA.earth;
             const futureSimTime = this.isPaused
                 ? (this.simulationTime || 0)
                 : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
 
-            // 预测地球位置
+            // 预测地球位置（使用真实轨道数据 + 初始相位）
+            const earthInitialMA = (earthData.initialMeanAnomaly || 0) * Math.PI / 180;
             const earthOrbit = new KeplerOrbit(earthData.distance, earthData.orbitalEccentricity, earthData.orbitalInclination);
-            const earthTheta = earthOrbit.getTrueAnomaly(futureSimTime, earthData.orbitalPeriod);
+            const earthTheta = earthOrbit.getTrueAnomaly(futureSimTime, earthData.orbitalPeriod, earthInitialMA);
             const earthPos = earthOrbit.getPosition3D(earthTheta);
 
-            // 预测月球相对地球位置
+            // 预测月球相对地球位置（使用真实轨道数据 + 初始相位）
+            const moonInitialMA = (moonData.initialMeanAnomaly || 0) * Math.PI / 180;
             const moonOrbit = new KeplerOrbit(moonData.distance, moonData.orbitalEccentricity, 0);
-            const moonTheta = moonOrbit.getTrueAnomaly(futureSimTime, moonData.orbitalPeriod);
+            const moonTheta = moonOrbit.getTrueAnomaly(futureSimTime, moonData.orbitalPeriod, moonInitialMA);
             const moonRel = moonOrbit.getPosition3D(moonTheta);
 
             // 月球世界坐标 = 地球位置 + 月球相对偏移
@@ -192,13 +195,41 @@ export class CameraController {
             return;
         }
 
+        // 彗星和矮行星特殊处理（在 cameraArrived 中包含信息数据）
+        if (planet.userData && (planet.userData.type === 'comet' || planet.userData.type === 'dwarfPlanet')) {
+            const data = planet.userData.data;
+            const orbit = new KeplerOrbit(data.distance, data.orbitalEccentricity, data.orbitalInclination);
+            const futureSimTime = this.isPaused
+                ? (this.simulationTime || 0)
+                : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
+            const initialMA = (data.initialMeanAnomaly || 0) * Math.PI / 180;
+            const theta = orbit.getTrueAnomaly(futureSimTime, data.orbitalPeriod, initialMA);
+            const pos = orbit.getPosition3D(theta);
+            const targetPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+            const planetRadius = planet.geometry ? planet.geometry.parameters.radius : 0.5;
+            const dist = 10;
+            const cameraAngle = Math.atan2(targetPos.x, targetPos.z);
+            const cameraTarget = new THREE.Vector3(
+                targetPos.x + dist * Math.sin(cameraAngle),
+                targetPos.y + planetRadius + 2,
+                targetPos.z + dist * Math.cos(cameraAngle)
+            );
+            this.animateFly(cameraTarget, targetPos, duration, () => {
+                window.dispatchEvent(new CustomEvent('cameraArrived', {
+                    detail: { name: data.name, data }
+                }));
+            });
+            return;
+        }
+
         // 计算目标位置：运动时预判，暂停时直接到达当前点
         const data = planet.userData.data;
         const orbit = new KeplerOrbit(data.distance, data.orbitalEccentricity, data.orbitalInclination);
         const futureSimTime = this.isPaused
             ? (this.simulationTime || 0)
             : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
-        const futureTheta = orbit.getTrueAnomaly(futureSimTime, data.orbitalPeriod);
+        const initialMA = (data.initialMeanAnomaly || 0) * Math.PI / 180;
+        const futureTheta = orbit.getTrueAnomaly(futureSimTime, data.orbitalPeriod, initialMA);
         const futurePos = orbit.getPosition3D(futureTheta);
         const targetPosition = new THREE.Vector3(futurePos.x, futurePos.y, futurePos.z);
 

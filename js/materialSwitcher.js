@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PLANET_DATA } from './planets.js';
+import { EXTENDED_DATA } from './extendedBodies.js';
 
 /**
  * 材质切换器
@@ -17,9 +18,10 @@ export class MaterialSwitcher {
      * @param {Object} planets - 由 createAllPlanets() 返回的行星对象
      * @param {Map<string, THREE.Texture>} textureMap - 纹理管理器的缓存 (TextureManager.cache)
      */
-    constructor(planets, textureMap) {
+    constructor(planets, textureMap, extendedBodies = {}) {
         this.planets = planets;
         this.textureMap = textureMap;
+        this.extendedBodies = extendedBodies;
         this.isTextureMode = false;
 
         // 保存每个行星的原始材质，用于切换回纯色模式
@@ -33,6 +35,9 @@ export class MaterialSwitcher {
             'mercury', 'venus', 'earth', 'mars',
             'jupiter', 'saturn', 'uranus', 'neptune'
         ];
+
+        // 扩展天体键名（矮行星 + 卫星）
+        this.extendedKeys = ['pluto', 'ceres', 'io', 'europa', 'ganymede', 'callisto', 'titan'];
 
         // 保存原始材质
         this._saveOriginalMaterials();
@@ -59,6 +64,14 @@ export class MaterialSwitcher {
             const planet = this.planets[key];
             if (planet && planet.material) {
                 this.originalMaterials.set(key, planet.material);
+            }
+        });
+
+        // 扩展天体
+        this.extendedKeys.forEach(key => {
+            const body = this.extendedBodies[key];
+            if (body && body.material) {
+                this.originalMaterials.set(key, body.material);
             }
         });
     }
@@ -146,6 +159,14 @@ export class MaterialSwitcher {
             });
         }
 
+        // 扩展天体光晕隐藏（哈雷彗星除外，它本身就亮）
+        this.extendedKeys.forEach(key => {
+            const body = this.extendedBodies[key];
+            if (body && body.userData && body.userData.glow) {
+                body.userData.glow.visible = false;
+            }
+        });
+
         // 月球特殊处理
         if (this.planets.moon) {
             const moonTexture = this.textureMap.get('moon');
@@ -157,6 +178,25 @@ export class MaterialSwitcher {
                 this.planets.moon.material = moonMaterial;
             }
         }
+
+        // 扩展天体：矮行星和卫星使用 MeshStandardMaterial + 纹理
+        this.extendedKeys.forEach(key => {
+            const body = this.extendedBodies[key];
+            if (!body) return;
+
+            const texture = this.textureMap.get(key);
+            if (!texture) return;
+
+            const newMaterial = new THREE.MeshStandardMaterial({
+                map: texture,
+                color: 0xffffff,
+                roughness: 0.5,
+                metalness: 0.1,
+            });
+
+            body.material.dispose();
+            body.material = newMaterial;
+        });
 
         this.isTextureMode = true;
     }
@@ -192,6 +232,14 @@ export class MaterialSwitcher {
             });
         }
 
+        // 恢复扩展天体光晕
+        this.extendedKeys.forEach(key => {
+            const body = this.extendedBodies[key];
+            if (body && body.userData && body.userData.glow) {
+                body.userData.glow.visible = true;
+            }
+        });
+
         this.originalMaterials.forEach((material, key) => {
             const planet = this.planets[key];
             if (!planet) return;
@@ -205,6 +253,19 @@ export class MaterialSwitcher {
                 planet.material.dispose();
                 planet.material = solidMaterial;
             }
+        });
+
+        // 恢复扩展天体的纯色材质
+        this.extendedKeys.forEach(key => {
+            const body = this.extendedBodies[key];
+            if (!body) return;
+
+            const extBodyData = EXTENDED_DATA[key];
+            const color = extBodyData ? extBodyData.color : 0x888888;
+
+            const solidMaterial = new THREE.MeshBasicMaterial({ color });
+            body.material.dispose();
+            body.material = solidMaterial;
         });
 
         this.isTextureMode = false;

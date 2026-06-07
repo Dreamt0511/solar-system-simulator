@@ -21,7 +21,7 @@ export class AsteroidBelt {
         for (let i = 0; i < this.count; i++) {
             const angle = Math.random() * Math.PI * 2;
             const band = Math.random();
-            const radius = 40 + band * 12 + (Math.random() - 0.5) * 1.8;
+            const radius = 35 + band * 7 + (Math.random() - 0.5) * 1.5;
             const height = (Math.random() - 0.5) * 2.2;
             const size = 0.35 + Math.random() * 0.75;
             const asteroid = new THREE.Mesh(geometry, material);
@@ -47,7 +47,7 @@ export class AsteroidBelt {
         this.group.add(mesh);
 
         // 碰撞环：不可见但可被射线检测，覆盖整个小行星带区域
-        const hitGeometry = new THREE.TorusGeometry(46, 10, 4, 64);
+        const hitGeometry = new THREE.TorusGeometry(38.5, 6, 4, 64);
         const hitMaterial = new THREE.MeshBasicMaterial({
             transparent: true,
             opacity: 0,
@@ -75,7 +75,8 @@ export class AsteroidBelt {
     }
 
     update(time) {
-        this.group.rotation.y = time * 0.025;
+        // 开普勒第三定律对应轨道速度：P∝d^1.5，belt中心~38.5，周期~46s，角速度~0.14 rad/s
+        this.group.rotation.y = time * 0.14;
     }
 
     dispose() {

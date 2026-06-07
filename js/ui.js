@@ -31,6 +31,14 @@ export class UIManager {
             showControls: false
         };
 
+        // 日期显示元素（可能不存在于 DOM）
+        this.dateDisplayEl = document.getElementById('date-display');
+
+        // 截图按钮（可能不存在于 DOM）
+        this.screenshotBtn = document.getElementById('screenshot-btn');
+
+        this.renderer = null;
+        this.postProcessing = null;
         this.quoteTimeoutId = null;
 
         // 地球音乐
@@ -67,6 +75,13 @@ export class UIManager {
         if (this.elements.resetBtn) {
             this.elements.resetBtn.addEventListener('click', () => {
                 this.emit('resetView');
+            });
+        }
+
+        // 截图按钮
+        if (this.screenshotBtn) {
+            this.screenshotBtn.addEventListener('click', () => {
+                this.captureScreenshot();
             });
         }
 
@@ -181,6 +196,73 @@ export class UIManager {
         }
         if (this.elements.loadingText && text) {
             this.elements.loadingText.textContent = text;
+        }
+    }
+
+    // 设置渲染器引用
+    setRenderer(renderer) {
+        this.renderer = renderer;
+    }
+
+    // 设置后处理引用（用于截图）
+    setPostProcessing(postProcessing) {
+        this.postProcessing = postProcessing;
+    }
+
+    // 更新日期显示
+    updateDateDisplay(simulationTime) {
+        if (!this.dateDisplayEl) return;
+
+        const now = new Date();
+        // simulationTime=0 时显示当前真实日期
+        // 每增加 365.25 秒模拟时间 = 过了一真实年
+        // 即 1 秒模拟时间 = 86400000 ms 真实时间
+        const simDate = new Date(now.getTime() + simulationTime * 86400000);
+
+        const year = simDate.getFullYear();
+        const month = String(simDate.getMonth() + 1).padStart(2, '0');
+        const day = String(simDate.getDate()).padStart(2, '0');
+
+        this.dateDisplayEl.textContent = `${year}年${month}月${day}`;
+    }
+
+    // 截图下载
+    captureScreenshot() {
+        console.log('[截图] 按钮点击, renderer:', !!this.renderer, 'postProcessing:', !!this.postProcessing);
+        if (!this.renderer) {
+            console.warn('[截图] renderer 未就绪');
+            return;
+        }
+
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const filename = `solar-system-${y}${m}${d}-${hh}${mm}${ss}.png`;
+
+        try {
+            // 确保 EffectComposer 最终 pass 输出到屏幕 canvas
+            if (this.postProcessing && this.postProcessing.toneMappingPass) {
+                this.postProcessing.toneMappingPass.renderToScreen = true;
+            }
+            // 手动触发一次渲染，确保 canvas 有内容
+            if (this.postProcessing) {
+                this.postProcessing.render();
+            }
+            // 读取 canvas 像素
+            const dataURL = this.renderer.domElement.toDataURL('image/png');
+            console.log('[截图] dataURL 长度:', dataURL.length);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataURL;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error('[截图] 失败:', err);
         }
     }
 

@@ -51,6 +51,9 @@
         </svg>
     </button>
 
+    <!-- 日期显示 -->
+    <div id="date-display">----年--月--日</div>
+
     <!-- 控制面板 -->
     <div id="controls-panel" class="hidden">
         <div class="panel-header">
@@ -66,12 +69,16 @@
             <div class="control-group">
                 <button id="pause-btn">暂停</button>
                 <button id="reset-btn">重置视角</button>
+                <button id="screenshot-btn">截图</button>
             </div>
             <div class="control-group">
                 <label>显示模式</label>
                 <div style="display:flex;gap:8px;flex-wrap:nowrap;">
                     <button id="texture-toggle" disabled style="flex:1;">真实纹理</button>
                     <button id="starfield-toggle" style="flex:1;">美丽星空</button>
+                </div>
+                <div style="margin-top:6px;">
+                    <button id="extra-orbits-toggle" class="toggle-btn">显示扩展轨道</button>
                 </div>
             </div>
         </div>

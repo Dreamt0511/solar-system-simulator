@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createScene, createLighting } from './scene.js';
 import { createAllPlanets, PLANET_DATA } from './planets.js';
-import { createAllOrbits, updatePlanetPosition, KeplerOrbit } from './orbital.js';
+import { createAllOrbits, updatePlanetPosition } from './orbital.js';
 import { CameraController } from './controls.js';
 import { PostProcessing } from './effects.js';
 import { UIManager } from './ui.js';
@@ -11,6 +11,11 @@ import { TextureManager } from './textureManager.js';
 import { MaterialSwitcher } from './materialSwitcher.js';
 import { PlanetList } from './planetList.js';
 import { StarfieldBackground } from './starfieldBackground.js';
+import { createExtendedBodies, EXTENDED_DATA } from './extendedBodies.js';
+import { getCurrentMeanAnomalies } from './ephemeris.js';
+import { createComet, updateComet } from './comet.js';
+import { createTrails, updateTrail } from './trailEffect.js';
+import { createSolarCorona, updateSolarCorona } from './solarCorona.js';
 
 class SolarSystemApp {
     constructor() {
@@ -27,6 +32,10 @@ class SolarSystemApp {
         this.textureManager = null;
         this.materialSwitcher = null;
         this.starfieldBackground = null;
+        this.extendedBodies = null;
+        this.comet = null;
+        this.trails = null;
+        this.corona = null;
 
         this.clock = new THREE.Clock();
         this.simulationTime = 0;
@@ -53,6 +62,20 @@ class SolarSystemApp {
         // 创建光照
         createLighting(this.scene);
 
+        this.uiManager.setLoadingProgress(25, '计算实时轨道位置...');
+
+        // 获取各天体当前真实位置（基于 NASA 历元数据推算）
+        const currentPositions = getCurrentMeanAnomalies();
+        for (const [key, ma] of Object.entries(currentPositions)) {
+            if (PLANET_DATA[key]) {
+                PLANET_DATA[key].initialMeanAnomaly = ma;
+            }
+            if (EXTENDED_DATA[key]) {
+                EXTENDED_DATA[key].initialMeanAnomaly = ma;
+            }
+        }
+        console.log('已设置实时轨道位置:', currentPositions);
+
         this.uiManager.setLoadingProgress(30, '生成星空...');
 
         // 创建星空
@@ -65,7 +88,6 @@ class SolarSystemApp {
 
         // 初始化纹理系统（后台预加载）
         this.textureManager = new TextureManager();
-        this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache);
         this.starfieldBackground = new StarfieldBackground(this.scene);
         this.texturesLoaded = false;
         this.textureLoadingPromise = this.textureManager.loadAll().then(() => {
@@ -75,18 +97,56 @@ class SolarSystemApp {
             console.error('纹理加载失败:', err);
         });
 
-        // 纹理按钮立即可用
-        const textureBtn = document.getElementById('texture-toggle');
-        if (textureBtn) {
-            textureBtn.disabled = false;
-            textureBtn.textContent = '开启';
-        }
-
         this.uiManager.setLoadingProgress(70, '计算轨道...');
 
         // 创建轨道线
         this.orbits = createAllOrbits(this.scene, PLANET_DATA);
         this.asteroidBelt = new AsteroidBelt(this.scene);
+
+        this.uiManager.setLoadingProgress(73, '创建扩展天体...');
+
+        // 创建矮行星、卫星和彗星
+        this.extendedBodies = createExtendedBodies(this.scene, this.planets);
+        this.comet = createComet(this.scene);
+        // 给彗核添加 userData 供点击和列表使用
+        if (this.comet && this.comet.nucleus) {
+            this.comet.nucleus.userData = {
+                type: 'comet',
+                key: 'halley',
+                data: {
+                    name: '哈雷彗星',
+                    distance: 63.5,
+                    orbitalEccentricity: 0.677,
+                    orbitalInclination: 162.18,
+                    orbitalPeriod: 97,
+                    initialMeanAnomaly: 192.25,
+                    info: {
+                        radius: '11 km（彗核）',
+                        mass: '2.2 × 10¹⁴ kg',
+                        distance: '0.59 AU ~ 35.1 AU',
+                        period: '75-76 年'
+                    }
+                }
+            };
+        }
+
+        this.uiManager.setLoadingProgress(76, '创建视觉效果...');
+
+        // 创建轨道拖尾和动态日冕
+        this.trails = createTrails(this.scene, PLANET_DATA);
+        this.corona = createSolarCorona(this.scene);
+
+        this.uiManager.setLoadingProgress(78, '初始化材质系统...');
+
+        // 创建材质切换器（此时 extendedBodies 已存在）
+        this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache, this.extendedBodies);
+
+        // 纹理按钮可用
+        const textureBtn = document.getElementById('texture-toggle');
+        if (textureBtn) {
+            textureBtn.disabled = false;
+            textureBtn.textContent = '真实纹理';
+        }
 
         this.uiManager.setLoadingProgress(80, '初始化控制器...');
 
@@ -98,9 +158,19 @@ class SolarSystemApp {
 
         // 初始化行星列表
         this.planetList = new PlanetList(
-            { ...this.planets, asteroidBelt: this.asteroidBelt?.hitMesh },
+            {
+                ...this.planets,
+                asteroidBelt: this.asteroidBelt?.hitMesh,
+                ceres: this.extendedBodies?.ceres,
+                pluto: this.extendedBodies?.pluto,
+                halley: this.comet?.nucleus
+            },
             this.cameraController
         );
+
+        // 给 UI 提供渲染器和后处理引用（用于截图）
+        this.uiManager.setRenderer(this.renderer);
+        this.uiManager.setPostProcessing(this.postProcessing);
 
         this.uiManager.setLoadingProgress(90, '绑定事件...');
 
@@ -187,6 +257,21 @@ class SolarSystemApp {
                 starfieldBtn.style.background = active ? '#4CAF50' : '';
             });
         }
+
+        // 扩展轨道开关
+        const extraOrbitsBtn = document.getElementById('extra-orbits-toggle');
+        if (extraOrbitsBtn) {
+            extraOrbitsBtn.addEventListener('click', () => {
+                const allExtraOrbits = [
+                    ...(this.extendedBodies?.orbitLines || []),
+                    this.comet?.orbitLine
+                ].filter(Boolean);
+
+                const visible = extraOrbitsBtn.classList.toggle('active');
+                allExtraOrbits.forEach(line => { line.visible = visible; });
+                extraOrbitsBtn.textContent = visible ? '隐藏扩展轨道' : '显示扩展轨道';
+            });
+        }
     }
 
     animate() {
@@ -202,10 +287,17 @@ class SolarSystemApp {
         // 更新行星位置
         this.updatePlanets();
 
-        // 更新月球 - 绕地球旋转（受暂停控制）
-        if (!this.isPaused && this.planets.moon && this.planets.moon.userData.orbitGroup) {
+        // 更新月球位置与自转 - 基于 simulationTime 计算，使用初始平近点角
+        if (this.planets.moon && this.planets.moon.userData.orbitGroup) {
             const moonData = PLANET_DATA.moon;
-            this.planets.moon.userData.orbitGroup.rotation.y += (2 * Math.PI) / (moonData.orbitalPeriod * 60);
+            const initialMA = (moonData.initialMeanAnomaly || 0) * Math.PI / 180;
+            this.planets.moon.userData.orbitGroup.rotation.y = (2 * Math.PI * this.simulationTime) / moonData.orbitalPeriod + initialMA;
+            this.planets.moon.rotation.y += moonData.rotationSpeed;
+        }
+
+        // 更新日期显示
+        if (this.uiManager) {
+            this.uiManager.updateDateDisplay(this.simulationTime);
         }
 
         // 更新星空闪烁
@@ -214,6 +306,22 @@ class SolarSystemApp {
         }
         if (this.asteroidBelt) {
             this.asteroidBelt.update(this.simulationTime);
+        }
+
+        // 更新扩展天体和彗星
+        if (this.extendedBodies) {
+            this.extendedBodies.update(this.simulationTime);
+        }
+        if (this.comet) {
+            updateComet(this.comet, this.simulationTime);
+        }
+
+        // 更新轨道拖尾和日冕
+        if (this.trails) {
+            updateTrail(this.trails, this.simulationTime, this.planets, PLANET_DATA);
+        }
+        if (this.corona) {
+            updateSolarCorona(this.corona, this.simulationTime);
         }
 
         // 更新太阳光晕动画

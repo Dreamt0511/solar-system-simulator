@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import http.server
 import socketserver
+import socket
 import webbrowser
 import os
 import sys
@@ -16,8 +17,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         super().end_headers()
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+    allow_reuse_port = True
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        super().server_bind()
+
 def main():
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+    with ReusableTCPServer(("", PORT), Handler) as httpd:
         host = "localhost"
         url = f"http://{host}:{PORT}"
         print(f"太阳系模拟器启动成功！")

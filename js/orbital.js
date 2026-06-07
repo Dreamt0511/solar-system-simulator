@@ -34,15 +34,20 @@ export class KeplerOrbit {
         };
     }
 
-    // 根据时间计算真近点角（简化版本）
-    getTrueAnomaly(time, orbitalPeriod) {
-        // 平近点角
-        const M = (2 * Math.PI * time) / orbitalPeriod;
+    // 根据时间计算真近点角
+    // @param {number} time - 模拟时间
+    // @param {number} orbitalPeriod - 轨道周期
+    // @param {number} [initialMeanAnomaly=0] - 初始平近点角偏移（弧度）
+    getTrueAnomaly(time, orbitalPeriod, initialMeanAnomaly = 0) {
+        // 平近点角 = 平均运动 × 时间 + 初始偏移
+        const M = (2 * Math.PI * time) / orbitalPeriod + initialMeanAnomaly;
 
-        // 开普勒方程迭代求解偏近点角 E
+        // 开普勒方程迭代求解偏近点角 E（牛顿法，20次保证高离心率收敛）
         let E = M;
-        for (let i = 0; i < 10; i++) {
-            E = M + this.e * Math.sin(E);
+        for (let i = 0; i < 20; i++) {
+            const dE = (M + this.e * Math.sin(E) - E) / (1 - this.e * Math.cos(E));
+            E += dE;
+            if (Math.abs(dE) < 1e-8) break;
         }
 
         // 真近点角
@@ -67,7 +72,7 @@ export class KeplerOrbit {
 }
 
 // 创建轨道可视化线
-export function createOrbitLine(scene, semimajorAxis, eccentricity, inclination, color = 0x666688) {
+export function createOrbitLine(scene, semimajorAxis, eccentricity, inclination, color = 0x666688, opacity = 0.6) {
     const orbit = new KeplerOrbit(semimajorAxis, eccentricity, inclination);
     const points = orbit.getCurvePoints(128);
 
@@ -75,7 +80,7 @@ export function createOrbitLine(scene, semimajorAxis, eccentricity, inclination,
     const material = new THREE.LineBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.6,
+        opacity,
         linewidth: 2
     });
 
@@ -117,8 +122,10 @@ export function updatePlanetPosition(planet, time, planetData) {
     const data = planetData[planet.userData.key];
     if (!data) return;
 
+    // 初始平近点角（度→弧度），让行星从真实当前位置开始
+    const initialMA = (data.initialMeanAnomaly || 0) * Math.PI / 180;
     const orbit = new KeplerOrbit(data.distance, data.orbitalEccentricity, data.orbitalInclination);
-    const theta = orbit.getTrueAnomaly(time, data.orbitalPeriod);
+    const theta = orbit.getTrueAnomaly(time, data.orbitalPeriod, initialMA);
     const pos = orbit.getPosition3D(theta);
 
     if (planet.userData.orbitGroup) {
@@ -132,8 +139,9 @@ export function updatePlanetPosition(planet, time, planetData) {
 // 更新月球位置
 export function updateMoonPosition(moon, earthPosition, time) {
     const moonData = PLANET_DATA.moon;
+    const initialMA = (moonData.initialMeanAnomaly || 0) * Math.PI / 180;
     const orbit = new KeplerOrbit(moonData.distance, moonData.orbitalEccentricity, 0);
-    const theta = orbit.getTrueAnomaly(time, moonData.orbitalPeriod);
+    const theta = orbit.getTrueAnomaly(time, moonData.orbitalPeriod, initialMA);
     const pos = orbit.getPosition3D(theta);
 
     moon.position.set(pos.x, pos.y, pos.z);

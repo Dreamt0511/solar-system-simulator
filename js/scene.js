@@ -25,7 +25,8 @@ export function createScene() {
         canvas,
         antialias: true,
         alpha: false,
-        powerPreference: 'high-performance'
+        powerPreference: 'high-performance',
+        preserveDrawingBuffer: true  // 允许截图
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
