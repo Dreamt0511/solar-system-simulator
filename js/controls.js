@@ -169,7 +169,7 @@ export class CameraController {
             const cameraTarget = new THREE.Vector3(r * 3, r * 2, r * 3);
             this.animateFly(cameraTarget, sunPos, duration, () => {
                 window.dispatchEvent(new CustomEvent('cameraArrived', {
-                    detail: { name: '太阳', data: planet.userData.data }
+                    detail: { name: planet.userData.data.name, data: planet.userData.data }
                 }));
             });
             return;
@@ -212,7 +212,7 @@ export class CameraController {
             );
             this.animateFly(cameraTarget, moonPos, duration, () => {
                 window.dispatchEvent(new CustomEvent('cameraArrived', {
-                    detail: { name: '月球', data: moonData }
+                    detail: { name: planet.userData.data.name, data: moonData }
                 }));
             });
             return;
@@ -245,56 +245,33 @@ export class CameraController {
             return;
         }
 
-        // 航天器特殊处理 — 预测地球位置+航天器相对偏移
+        // 航天器特殊处理（全部使用真实世界坐标）
         if (planet.userData && planet.userData.type === 'spacecraft') {
-            const earthData = PLANET_DATA.earth;
-            const futureSimTime = this.isPaused
-                ? (this.simulationTime || 0)
-                : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
-            const earthInitialMA = (earthData.initialMeanAnomaly || 0) * Math.PI / 180;
-            const earthOrbit = new KeplerOrbit(earthData.distance, earthData.orbitalEccentricity, earthData.orbitalInclination);
-            const earthTheta = earthOrbit.getTrueAnomaly(futureSimTime, earthData.orbitalPeriod, earthInitialMA);
-            const earthPos = earthOrbit.getPosition3D(earthTheta);
-            // 航天器在地球局部的位置 (沿轨道方向偏移)
-            const orbitAngle = (2 * Math.PI * futureSimTime) / 3;
-            const incl = (planet.userData.key === 'tiangong') ? -41.5 : (planet.userData.key === 'iss' ? -51.6 : 0);
-            const inclRad = THREE.MathUtils.degToRad(incl);
-            const localPos = new THREE.Vector3(1.8, 0, 0);
-            if (Math.abs(incl) > 0.1) {
-                const qIncl = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), inclRad);
-                localPos.applyQuaternion(qIncl);
-            }
-            const qRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), orbitAngle);
-            localPos.applyQuaternion(qRot);
-            const predictedPos = new THREE.Vector3(
-                earthPos.x + localPos.x, earthPos.y + localPos.y, earthPos.z + localPos.z
-            );
-            // 旅行者一号：直接取当前位置，相机位于旅行者前进方向的前方，回望太阳系
+            // 旅行者一号：相机在旅行者外侧上方，朝向太阳系方向以方便参照
             if (planet.userData.key === 'voyager') {
                 const curPos = new THREE.Vector3();
                 planet.getWorldPosition(curPos);
 
-                // 旅行者沿 X 轴正方向远离太阳，轨道容器绕 X 轴旋转了 35°
-                // 前进方向大致为 (1, 0, 0) 经 35° X 轴旋转
-                const dir = new THREE.Vector3(1, 0, 0);
-                const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(35));
-                dir.applyQuaternion(q);
-                dir.normalize();
-
-                // 相机在旅行者前方，回望太阳系
-                const lookDist = 8;
-                const cameraTarget = curPos.clone().add(dir.clone().multiplyScalar(lookDist));
+                // 从太阳指向旅行者的方向（向外）
+                const outDir = curPos.clone().normalize();
+                // 相机位于旅行者外侧（远离太阳方向）上方，看向旅行者
+                // 这样旅行者在画面中，背景能看到太阳系作为参照
+                const lookDist = 2;
+                const upOffset = new THREE.Vector3(0, 1.5, 0);
+                const cameraTarget = curPos.clone().add(outDir.multiplyScalar(lookDist)).add(upOffset);
                 this.animateFly(cameraTarget, curPos, duration, () => {
                     window.dispatchEvent(new CustomEvent('cameraArrived', {
                         detail: { name: planet.userData.name, data: planet.userData.data }
                     }));
                 });
             } else {
-                const dist = 12;
+                // ISS/天宫：直接取真实世界坐标，相机靠近
+                const curPos = new THREE.Vector3();
+                planet.getWorldPosition(curPos);
                 const cameraTarget = new THREE.Vector3(
-                    predictedPos.x + dist, predictedPos.y + dist * 0.3, predictedPos.z + dist
+                    curPos.x + 1.5, curPos.y + 1, curPos.z + 1.5
                 );
-                this.animateFly(cameraTarget, predictedPos, duration, () => {
+                this.animateFly(cameraTarget, curPos, duration, () => {
                     window.dispatchEvent(new CustomEvent('cameraArrived', {
                         detail: { name: planet.userData.name, data: planet.userData.data }
                     }));

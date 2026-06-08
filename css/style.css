@@ -298,13 +298,6 @@ html, body {
         max-height: calc(100vh - 90px);
     }
 
-    .settings-icon {
-        bottom: 8px;
-        right: 8px;
-        width: 40px;
-        height: 40px;
-    }
-
     .panel-header {
         padding: 6px 10px;
     }
@@ -375,11 +368,10 @@ html, body {
     background: rgba(255, 255, 255, 0.3);
 }
 
-/* 设置图标 */
-.settings-icon {
+/* 底部圆形按钮通用样式 */
+.settings-icon,
+#lang-toggle {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -394,9 +386,37 @@ html, body {
     transition: all 0.3s ease;
 }
 
-.settings-icon:hover {
+.settings-icon:hover,
+#lang-toggle:hover {
     background: rgba(0, 0, 0, 0.8);
     transform: scale(1.1);
+}
+
+/* 设置图标 */
+.settings-icon { bottom: 20px; right: 20px; }
+
+/* 语言切换按钮 */
+#lang-toggle {
+    bottom: 78px;
+    right: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.5px;
+}
+#lang-toggle:hover { border-color: rgba(255, 255, 255, 0.4); }
+
+@media (max-width: 768px) {
+    .settings-icon { width: 44px; height: 44px; bottom: 15px; right: 15px; }
+    #lang-toggle { width: 40px; height: 40px; font-size: 10px; bottom: 70px; right: 14px; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+    #lang-toggle { width: 36px; height: 36px; font-size: 9px; bottom: 64px; right: 10px; }
+}
+
+@media (max-width: 480px) {
+    .settings-icon { width: 40px; height: 40px; bottom: 8px; right: 8px; }
 }
 
 /* 控制面板定位 */
@@ -567,12 +587,6 @@ html, body {
 
 /* 手机适配 */
 @media (max-width: 768px) {
-    .settings-icon {
-        bottom: 15px;
-        right: 15px;
-        width: 44px;
-        height: 44px;
-    }
 
     #controls-panel {
         top: auto;

@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export class UIManager {
     constructor() {
         this.elements = {
@@ -50,6 +52,7 @@ export class UIManager {
 
         this.setupEventListeners();
         this.checkOrientation();
+        this.setupI18n();
     }
 
     setupEventListeners() {
@@ -66,7 +69,7 @@ export class UIManager {
         if (this.elements.pauseBtn) {
             this.elements.pauseBtn.addEventListener('click', () => {
                 this.state.isPaused = !this.state.isPaused;
-                this.elements.pauseBtn.textContent = this.state.isPaused ? '继续' : '暂停';
+                this.elements.pauseBtn.textContent = this.state.isPaused ? t('ui.resume') : t('ui.pause');
                 this.emit('pauseChanged', this.state.isPaused);
             });
         }
@@ -160,7 +163,7 @@ export class UIManager {
             case ' ':
                 e.preventDefault();
                 this.state.isPaused = !this.state.isPaused;
-                this.elements.pauseBtn.textContent = this.state.isPaused ? '继续' : '暂停';
+                this.elements.pauseBtn.textContent = this.state.isPaused ? t('ui.resume') : t('ui.pause');
                 this.emit('pauseChanged', this.state.isPaused);
                 break;
             case 'r':
@@ -188,6 +191,17 @@ export class UIManager {
                 this.elements.orientationWarning.classList.add('hidden');
             }
         }
+    }
+
+    setupI18n() {
+      window.addEventListener('languageChanged', () => {
+        // 暂停按钮（需要根据当前状态动态切换）
+        if (this.elements.pauseBtn) {
+          this.elements.pauseBtn.textContent = this.state.isPaused ? t('ui.resume') : t('ui.pause');
+        }
+        // 更新日期格式
+        this.updateDateDisplay(0);
+      });
     }
 
     // 加载进度
@@ -224,7 +238,8 @@ export class UIManager {
         const month = String(simDate.getMonth() + 1).padStart(2, '0');
         const day = String(simDate.getDate()).padStart(2, '0');
 
-        this.dateDisplayEl.textContent = `${year}年${month}月${day}`;
+        const fmt = t('ui.dateFormat');
+        this.dateDisplayEl.textContent = fmt.replace('{y}', year).replace('{m}', month).replace('{d}', day);
     }
 
     // 截图下载

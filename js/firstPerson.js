@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PLANET_DATA } from './planets.js';
 import { KeplerOrbit } from './orbital.js';
+import { t } from './i18n.js';
 
 // ============================================================
 // 行星表面第一人称视角
@@ -234,6 +235,9 @@ function setupEventListeners() {
     // ESC 退出
     window.addEventListener('keydown', onKeyDown);
 
+    // 语言变化时更新提示文本
+    window.addEventListener('languageChanged', updateHintText);
+
     // 飞行到达后自动进入表面
     window.addEventListener('cameraArrived', (e) => {
         if (_pendingFirstPerson && e.detail && e.detail.name) {
@@ -323,8 +327,16 @@ function showFirstPersonHint(planetKey) {
 
     const data = PLANET_DATA[planetKey];
     const name = data ? data.name : planetKey;
-    _hintEl.textContent = name + ' 表面 — 拖拽环顾 | 双击或 ESC 退出';
+    _hintEl.textContent = t('firstPerson.hint').replace('{name}', name);
     _hintEl.style.opacity = '1';
+}
+
+function updateHintText() {
+    if (_hintEl && _isActive && _currentPlanetKey) {
+        const data = PLANET_DATA[_currentPlanetKey];
+        const name = data ? data.name : _currentPlanetKey;
+        _hintEl.textContent = t('firstPerson.hint').replace('{name}', name);
+    }
 }
 
 function hideFirstPersonHint() {

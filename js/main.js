@@ -21,6 +21,7 @@ import { createSolarFlares, updateSolarFlares } from './solarFlares.js';
 import { createPlanetDetails, updatePlanetDetails } from './planetDetails.js';
 import { createCosmicPhenomena, updateCosmicPhenomena } from './cosmicPhenomena.js';
 import { createFirstPerson, updateFirstPerson, setOrbitControls, setCameraController } from './firstPerson.js';
+import { t, setLang, getLang, getLangData } from './i18n.js';
 
 class SolarSystemApp {
     constructor() {
@@ -59,7 +60,7 @@ class SolarSystemApp {
         try {
         // 初始化UI
         this.uiManager = new UIManager();
-        this.uiManager.setLoadingProgress(10, '初始化场景...');
+        this.uiManager.setLoadingProgress(10, t('loading.initScene'));
 
         // 创建场景
         const { scene, camera, renderer } = createScene();
@@ -67,12 +68,12 @@ class SolarSystemApp {
         this.camera = camera;
         this.renderer = renderer;
 
-        this.uiManager.setLoadingProgress(20, '创建光照...');
+        this.uiManager.setLoadingProgress(20, t('loading.createLighting'));
 
         // 创建光照
         createLighting(this.scene);
 
-        this.uiManager.setLoadingProgress(25, '计算实时轨道位置...');
+        this.uiManager.setLoadingProgress(25, t('loading.calcPosition'));
 
         // 获取各天体当前真实位置（基于 NASA 历元数据推算）
         const currentPositions = getCurrentMeanAnomalies();
@@ -86,12 +87,12 @@ class SolarSystemApp {
         }
         console.log('已设置实时轨道位置:', currentPositions);
 
-        this.uiManager.setLoadingProgress(30, '生成星空...');
+        this.uiManager.setLoadingProgress(30, t('loading.genStars'));
 
         // 创建星空
         this.starfield = new Starfield(this.scene, 50000);
 
-        this.uiManager.setLoadingProgress(50, '创建行星...');
+        this.uiManager.setLoadingProgress(50, t('loading.createPlanets'));
 
         // 创建行星
         this.planets = createAllPlanets(this.scene);
@@ -107,13 +108,13 @@ class SolarSystemApp {
             console.error('纹理加载失败:', err);
         });
 
-        this.uiManager.setLoadingProgress(70, '计算轨道...');
+        this.uiManager.setLoadingProgress(70, t('loading.calcOrbits'));
 
         // 创建轨道线
         this.orbits = createAllOrbits(this.scene, PLANET_DATA);
         this.asteroidBelt = new AsteroidBelt(this.scene);
 
-        this.uiManager.setLoadingProgress(73, '创建扩展天体...');
+        this.uiManager.setLoadingProgress(73, t('loading.createExtended'));
 
         // 创建矮行星、卫星和彗星
         this.extendedBodies = createExtendedBodies(this.scene, this.planets);
@@ -140,7 +141,7 @@ class SolarSystemApp {
             };
         }
 
-        this.uiManager.setLoadingProgress(76, '创建视觉效果...');
+        this.uiManager.setLoadingProgress(76, t('loading.createEffects'));
 
         // 创建轨道拖尾和动态日冕
         this.trails = createTrails(this.scene, PLANET_DATA);
@@ -158,7 +159,7 @@ class SolarSystemApp {
         // 创建宇宙现象（拉格朗日点、宜居带、凌日）
         this.cosmicPhenomena = createCosmicPhenomena(this.scene);
 
-        this.uiManager.setLoadingProgress(78, '初始化材质系统...');
+        this.uiManager.setLoadingProgress(78, t('loading.initMaterial'));
 
         // 创建材质切换器（此时 extendedBodies、planetDetails 已存在）
         this.materialSwitcher = new MaterialSwitcher(
@@ -169,10 +170,10 @@ class SolarSystemApp {
         const textureBtn = document.getElementById('texture-toggle');
         if (textureBtn) {
             textureBtn.disabled = false;
-            textureBtn.textContent = '真实纹理';
+            textureBtn.textContent = t('ui.texture');
         }
 
-        this.uiManager.setLoadingProgress(80, '初始化控制器...');
+        this.uiManager.setLoadingProgress(80, t('loading.initControl'));
 
         // 初始化相机控制器
         this.cameraController = new CameraController(this.camera, this.renderer, this.scene);
@@ -205,12 +206,15 @@ class SolarSystemApp {
         this.uiManager.setRenderer(this.renderer);
         this.uiManager.setPostProcessing(this.postProcessing);
 
-        this.uiManager.setLoadingProgress(90, '绑定事件...');
+        // 初始化语言切换
+        this.setupLanguageToggle();
+
+        this.uiManager.setLoadingProgress(90, t('loading.bindEvents'));
 
         // 绑定UI事件
         this.setupUIBindings();
 
-        this.uiManager.setLoadingProgress(100, '准备就绪！');
+        this.uiManager.setLoadingProgress(100, t('loading.ready'));
 
         // 短暂延迟后隐藏加载界面
         setTimeout(() => {
@@ -227,13 +231,103 @@ class SolarSystemApp {
             if (loading) {
                 const loadingText = document.getElementById('loading-text');
                 if (loadingText) {
-                    loadingText.textContent = '加载失败: ' + error.message;
+                    loadingText.textContent = t('loading.loadFailed') + error.message;
                 }
                 setTimeout(() => {
                     loading.style.display = 'none';
                 }, 3000);
             }
         }
+    }
+
+    applyLanguage(lang) {
+      const data = getLangData(lang);
+
+      // 更新 PLANET_DATA
+      const pd = data.planets;
+      for (const [key, p] of Object.entries(pd)) {
+        if (PLANET_DATA[key]) {
+          PLANET_DATA[key].name = p.name;
+          if (p.info) Object.assign(PLANET_DATA[key].info, p.info);
+        }
+      }
+
+      // 更新 EXTENDED_DATA
+      const ed = data.extended;
+      for (const [key, e] of Object.entries(ed)) {
+        if (EXTENDED_DATA[key]) {
+          EXTENDED_DATA[key].name = e.name;
+          if (e.info) Object.assign(EXTENDED_DATA[key].info, e.info);
+        }
+      }
+
+      // 更新场景中非 PLANET_DATA 节点的 userData
+      if (this.scene) {
+        this.scene.traverse((child) => {
+          const uk = child.userData?.key;
+          if (!uk) return;
+
+          // 航天器
+          const sc = data.spacecraft?.[uk];
+          if (sc && child.userData.data) {
+            child.userData.data.name = sc.name;
+            child.userData.name = sc.name;
+            if (sc.info) Object.assign(child.userData.data.info, sc.info);
+            return;
+          }
+
+          // 小行星带
+          if (uk === 'asteroidBelt' && data.asteroidBelt && child.userData.data) {
+            const ab = data.asteroidBelt;
+            child.userData.data.name = ab.name;
+            if (ab.info) Object.assign(child.userData.data.info, ab.info);
+            return;
+          }
+
+          // 哈雷彗星
+          if (uk === 'halley' && data.comet && child.userData.data) {
+            const co = data.comet;
+            child.userData.data.name = co.name;
+            if (co.info) Object.assign(child.userData.data.info, co.info);
+          }
+        });
+      }
+
+      // 更新 DOM data-i18n 元素
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const val = t(el.dataset.i18n);
+        if (val) el.textContent = val;
+      });
+
+      // 更新页面标题
+      const title = t('title');
+      if (title) document.title = title;
+
+      // 更新 lang-toggle 按钮文本
+      const langBtn = document.getElementById('lang-toggle');
+      if (langBtn) {
+        const langs = ['zh', 'en'];
+        const next = langs.find(l => l !== lang) || 'en';
+        langBtn.textContent = lang === 'zh' ? '中 / EN' : 'EN / 中';
+        langBtn.dataset.nextLang = next;
+      }
+    }
+
+    setupLanguageToggle() {
+      const btn = document.getElementById('lang-toggle');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const next = getLang() === 'zh' ? 'en' : 'zh';
+        setLang(next);
+      });
+
+      // 监听外部语言变化（setLang 派发的 customEvent）
+      window.addEventListener('languageChanged', (e) => {
+        this.applyLanguage(e.detail.lang);
+      });
+
+      // 初始语言重新应用（此时场景对象已创建，可更新 spacecraft userData 等）
+      this.applyLanguage(getLang());
     }
 
     setupUIBindings() {
@@ -270,13 +364,13 @@ class SolarSystemApp {
 
                 if (!this.texturesLoaded) {
                     textureBtn.disabled = true;
-                    textureBtn.textContent = '加载中...';
+                    textureBtn.textContent = t('loading.loadingTexture');
                     await this.textureLoadingPromise;
                     textureBtn.disabled = false;
                 }
 
                 this.materialSwitcher.toggle();
-                textureBtn.textContent = '真实纹理';
+                textureBtn.textContent = t('ui.texture');
                 textureBtn.style.background = this.materialSwitcher.isTextureMode ? '#4CAF50' : '';
             });
         }
@@ -286,7 +380,7 @@ class SolarSystemApp {
                 if (!this.starfieldBackground) return;
 
                 const active = await this.starfieldBackground.toggle();
-                starfieldBtn.textContent = '美丽星空';
+                starfieldBtn.textContent = t('ui.starfield');
                 starfieldBtn.style.background = active ? '#4CAF50' : '';
             });
         }
@@ -302,7 +396,7 @@ class SolarSystemApp {
 
                 const visible = extraOrbitsBtn.classList.toggle('active');
                 allExtraOrbits.forEach(line => { line.visible = visible; });
-                extraOrbitsBtn.textContent = visible ? '隐藏扩展轨道' : '显示扩展轨道';
+                extraOrbitsBtn.textContent = visible ? t('ui.hideExtraOrbits') : t('ui.showExtraOrbits');
             });
         }
 
@@ -324,7 +418,7 @@ class SolarSystemApp {
                 if (!this.spacecraft?.starlink) return;
                 const visible = starlinkBtn.classList.toggle('active');
                 this.spacecraft.starlink.worldGroup.visible = visible;
-                starlinkBtn.textContent = visible ? '隐藏星链' : '显示星链';
+                starlinkBtn.textContent = visible ? t('ui.hideStarlink') : t('ui.showStarlink');
             });
         }
     }

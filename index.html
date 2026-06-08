@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>太阳系模拟器</title>
+    <title data-i18n="title">太阳系模拟器</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <!-- 横屏提示 -->
     <div id="orientation-warning" class="hidden">
         <div class="warning-content">
-            <p>请旋转设备至横屏模式以获得最佳体验</p>
+            <p data-i18n="orientation">请旋转设备至横屏模式以获得最佳体验</p>
         </div>
     </div>
 
     <!-- 加载界面 -->
     <div id="loading-screen">
         <div class="loading-content">
-            <h1>太阳系模拟器</h1>
+            <h1 data-i18n="loadingTitle">太阳系模拟器</h1>
             <div class="progress-bar">
                 <div class="progress-fill" id="progress-fill"></div>
             </div>
-            <p id="loading-text">正在加载...</p>
+            <p id="loading-text" data-i18n="loadingInitial">正在加载...</p>
         </div>
     </div>
 
@@ -38,7 +38,7 @@
         </svg>
       </button>
       <div id="planet-list-panel" class="hidden">
-        <div class="planet-list-header">天体</div>
+        <div class="planet-list-header" data-i18n="ui.planetListHeader">天体</div>
         <div id="planet-list-items"></div>
       </div>
     </div>
@@ -51,38 +51,41 @@
         </svg>
     </button>
 
+    <!-- 语言切换 -->
+    <button id="lang-toggle">中 / EN</button>
+
     <!-- 日期显示 -->
     <div id="date-display">----年--月--日</div>
 
     <!-- 控制面板 -->
     <div id="controls-panel" class="hidden">
         <div class="panel-header">
-            <h3>控制面板</h3>
+            <h3 data-i18n="ui.panelHeader">控制面板</h3>
             <button id="close-panel">×</button>
         </div>
         <div class="panel-content">
             <div class="control-group">
-                <label>时间速度</label>
+                <label data-i18n="ui.speedLabel">时间速度</label>
                 <input type="range" id="time-speed" min="0.1" max="100" step="0.1" value="1">
                 <span id="time-speed-value">1x</span>
             </div>
             <div class="control-group">
-                <button id="pause-btn">暂停</button>
-                <button id="reset-btn">重置视角</button>
-                <button id="screenshot-btn">截图</button>
+                <button id="pause-btn" data-i18n="ui.pause">暂停</button>
+                <button id="reset-btn" data-i18n="ui.resetView">重置视角</button>
+                <button id="screenshot-btn" data-i18n="ui.screenshot">截图</button>
             </div>
             <div class="control-group">
-                <label>显示模式</label>
+                <label data-i18n="ui.displayMode">显示模式</label>
                 <div style="display:flex;gap:8px;flex-wrap:nowrap;">
-                    <button id="texture-toggle" disabled style="flex:1;">真实纹理</button>
-                    <button id="starfield-toggle" style="flex:1;">美丽星空</button>
+                    <button id="texture-toggle" disabled style="flex:1;" data-i18n="ui.texture">真实纹理</button>
+                    <button id="starfield-toggle" style="flex:1;" data-i18n="ui.starfield">美丽星空</button>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:6px;">
-                    <button id="extra-orbits-toggle" class="toggle-btn" style="flex:1;">显示扩展轨道</button>
-                    <button id="habitable-toggle" class="toggle-btn" style="flex:1;">宜居带</button>
+                    <button id="extra-orbits-toggle" class="toggle-btn" style="flex:1;" data-i18n="ui.showExtraOrbits">显示扩展轨道</button>
+                    <button id="habitable-toggle" class="toggle-btn" style="flex:1;" data-i18n="ui.habitable">宜居带</button>
                 </div>
                 <div style="margin-top:6px;">
-                    <button id="starlink-toggle" class="toggle-btn">显示星链</button>
+                    <button id="starlink-toggle" class="toggle-btn" data-i18n="ui.showStarlink">显示星链</button>
                 </div>
             </div>
         </div>
@@ -91,28 +94,28 @@
     <!-- 信息面板 -->
     <div id="info-panel" class="hidden">
         <div class="panel-header">
-            <h3 id="planet-name">行星名称</h3>
+            <h3 id="planet-name" data-i18n="info.planetName">行星名称</h3>
             <button id="close-info">×</button>
         </div>
         <div class="panel-content">
             <div class="info-row">
-                <span class="label">半径：</span>
+                <span class="label" data-i18n="info.radius">半径：</span>
                 <span id="planet-radius" class="value">-</span>
             </div>
             <div class="info-row">
-                <span class="label">质量：</span>
+                <span class="label" data-i18n="info.mass">质量：</span>
                 <span id="planet-mass" class="value">-</span>
             </div>
             <div class="info-row">
-                <span class="label">距太阳：</span>
+                <span class="label" data-i18n="info.distance">距太阳：</span>
                 <span id="planet-distance" class="value">-</span>
             </div>
             <div class="info-row">
-                <span class="label">公转周期：</span>
+                <span class="label" data-i18n="info.period">公转周期：</span>
                 <span id="planet-period" class="value">-</span>
             </div>
             <div class="info-row">
-                <span class="label">卫星：</span>
+                <span class="label" data-i18n="info.moons">卫星：</span>
                 <span id="planet-moons" class="value">-</span>
             </div>
         </div>

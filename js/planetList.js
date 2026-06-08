@@ -1,3 +1,5 @@
+import { getLang, getLangData } from './i18n.js';
+
 const LIST_ITEMS = [
   { key: 'sun', label: '太阳', color: '#ff7a1f' },
   { key: 'mercury', label: '水星', color: '#8c7e6d' },
@@ -34,13 +36,15 @@ export class PlanetList {
   }
 
   render() {
+    const listData = getLangData(getLang()).listItems;
     LIST_ITEMS.forEach(item => {
       const el = document.createElement('div');
       el.className = 'planet-list-item';
       el.dataset.key = item.key;
+      const label = listData[item.key] || item.key;
       el.innerHTML = [
         '<span class="planet-list-dot" style="background:' + item.color + '"></span>',
-        '<span class="planet-list-label">' + item.label + '</span>'
+        '<span class="planet-list-label" data-i18n="listItems.' + item.key + '">' + label + '</span>'
       ].join('');
       this.itemsContainer.appendChild(el);
     });
