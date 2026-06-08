@@ -195,17 +195,10 @@ function createTiangong(scene, earth) {
 //   ISS 420km → 1.80，星链 525-570km → 1.87-1.97，月球 → 2.5
 function createStarlink(scene, earth) {
     const SHELLS = [
-        // Gen2（V2 Mini，新星链）— 轨道更低、更大更亮
-        { planes: 72, perPlane: 22, distance: 1.87, inclination: 53.0,  gen: 2, label: '525km' },
-        { planes: 72, perPlane: 22, distance: 1.88, inclination: 43.0,  gen: 2, label: '530km' },
-        { planes: 72, perPlane: 22, distance: 1.89, inclination: 53.0,  gen: 2, label: '535km' },
-        { planes: 72, perPlane: 22, distance: 1.89, inclination: 33.0,  gen: 2, label: '540km' },
-        { planes: 72, perPlane: 22, distance: 1.90, inclination: 40.0,  gen: 2, label: '540km' },
-        { planes: 36, perPlane: 20, distance: 1.90, inclination: 97.6,  gen: 2, label: '545km' },
-        // Gen1（V1.5，老星链）
-        { planes: 72, perPlane: 22, distance: 1.94, inclination: 53.0,  gen: 1, label: '550km' },
-        { planes: 36, perPlane: 20, distance: 1.97, inclination: 70.0,  gen: 1, label: '570km' },
-        { planes:  6, perPlane: 58, distance: 1.96, inclination: 97.6,  gen: 1, label: '560km' },
+        { planes: 72, perPlane: 22, distance: 1.87, inclination: 53.0 },
+        { planes: 66, perPlane: 22, distance: 1.90, inclination: 53.0 },
+        { planes: 54, perPlane: 22, distance: 1.94, inclination: 53.0 },
+        { planes: 12, perPlane: 28, distance: 1.96, inclination: 97.6 },
     ];
 
     // 每个壳层一个独立的 Points
@@ -245,7 +238,7 @@ function createStarlink(scene, earth) {
                 pos[ci * 3]     = local.x;
                 pos[ci * 3 + 1] = local.y;
                 pos[ci * 3 + 2] = local.z;
-                sz[ci] = 0.008 + Math.random() * 0.012;
+                sz[ci] = 0.008 + Math.random() * 0.014;
                 ci++;
             }
         }
@@ -263,22 +256,30 @@ function createStarlink(scene, earth) {
                 attribute float aSize;
                 uniform float uTime;
                 uniform float uPixelRatio;
-                varying float vOpacity;
+                varying float vAlpha;
+                varying float vGlowSize;
                 void main() {
-                    float flicker = 0.7 + 0.3 * sin(uTime * 3.0 + aSize * 500.0);
-                    vOpacity = flicker;
+                    float flicker = 0.92 + 0.08 * sin(uTime * 2.0 + aSize * 800.0);
                     vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = aSize * flicker * uPixelRatio * (300.0 / -mvPos.z);
-                    gl_PointSize = clamp(gl_PointSize, 1.0, 8.0);
+                    float viewDist = -mvPos.z;
+                    float distFade = 1.0 - smoothstep(15.0, 55.0, viewDist);
+                    float s = aSize * flicker * uPixelRatio * (700.0 / viewDist) * distFade;
+                    gl_PointSize = clamp(s, 0.0, 10.0);
+                    vAlpha = flicker * distFade;
+                    vGlowSize = distFade;
                     gl_Position = projectionMatrix * mvPos;
                 }
             `,
             fragmentShader: `
-                varying float vOpacity;
+                varying float vAlpha;
+                varying float vGlowSize;
                 void main() {
-                    float d = length(gl_PointCoord - vec2(0.5));
+                    vec2 center = gl_PointCoord - vec2(0.5);
+                    float d = length(center);
                     if (d > 0.5) discard;
-                    float alpha = smoothstep(0.5, 0.1, d) * vOpacity * 0.9;
+                    float core = 1.0 - smoothstep(0.0, 0.04, d);
+                    float glow = exp(-d * 8.0);
+                    float alpha = clamp(core + glow * vGlowSize * 0.7, 0.0, 1.0);
                     gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
                 }
             `,
@@ -295,6 +296,7 @@ function createStarlink(scene, earth) {
     });
 
     earth.add(group);
+    group.visible = false;
 
     group.userData = {
         type: 'spacecraft',

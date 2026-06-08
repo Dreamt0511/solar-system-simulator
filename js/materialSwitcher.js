@@ -130,43 +130,11 @@ export class MaterialSwitcher {
 
             // 地球特殊处理：真实纹理 + 昼夜转换
             if (key === 'earth' && this.earthNightShader) {
-                const shaderMat = new THREE.ShaderMaterial({
-                    uniforms: {
-                        dayMap: { value: texture },
-                        nightMap: { value: this.earthNightShader.nightTexture },
-                        sunDirection: { value: new THREE.Vector3(1, 0, 0) },
-                        nightIntensity: { value: 1.5 },
-                    },
-                    vertexShader: `
-                        varying vec2 vUv;
-                        varying vec3 vNormal;
-                        void main() {
-                            vUv = uv;
-                            vNormal = normalize(normalMatrix * normal);
-                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                        }
-                    `,
-                    fragmentShader: `
-                        uniform sampler2D dayMap;
-                        uniform sampler2D nightMap;
-                        uniform vec3 sunDirection;
-                        uniform float nightIntensity;
-                        varying vec2 vUv;
-                        varying vec3 vNormal;
-                        void main() {
-                            vec3 normal = normalize(vNormal);
-                            float NdotL = dot(normal, sunDirection);
-                            float dayFactor = smoothstep(-0.15, 0.25, NdotL);
-                            vec4 dayColor = texture2D(dayMap, vUv);
-                            vec4 nightColor = texture2D(nightMap, vUv);
-                            gl_FragColor = mix(nightColor * nightIntensity, dayColor, dayFactor);
-                        }
-                    `,
-                });
+                const stored = this.earthNightShader;
+                stored.shaderMaterial.uniforms.dayMap.value = texture;
+                stored.shaderMaterial.uniforms.nightMap.value = stored.nightTexture;
                 planet.material.dispose();
-                planet.material = shaderMat;
-                // 同步引用，让 updatePlanetDetails 的 sunDirection 更新继续生效
-                this.earthNightShader.shaderMaterial = shaderMat;
+                planet.material = stored.shaderMaterial;
                 return;
             }
 
@@ -287,15 +255,14 @@ export class MaterialSwitcher {
             const planet = this.planets[key];
             if (!planet) return;
 
-            // 纯色模式：所有行星统一使用 MeshBasicMaterial + 纯色（包括地球）
             const data = PLANET_DATA[key];
-            if (data) {
-                const solidMaterial = new THREE.MeshBasicMaterial({
-                    color: data.color,
-                });
-                planet.material.dispose();
-                planet.material = solidMaterial;
-            }
+            if (!data) return;
+
+            const solidMaterial = new THREE.MeshBasicMaterial({
+                color: data.color,
+            });
+            planet.material.dispose();
+            planet.material = solidMaterial;
         });
 
         // 恢复扩展天体的纯色材质

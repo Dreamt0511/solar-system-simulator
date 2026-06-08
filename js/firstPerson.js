@@ -8,13 +8,16 @@ import { KeplerOrbit } from './orbital.js';
 
 // --- 内部状态 ---
 let _renderer, _camera, _scene, _planets;
-let _orbitControls = null; // 保存原有的轨道控制器引用
+let _cameraController = null;
+let _orbitControls = null;
 let _isActive = false;
 let _currentPlanetKey = null;
-let _lookEuler = new THREE.Euler(0, 0, 0, 'YXZ'); // 环顾方向
+let _yaw = 0;
+let _pitch = 0;
 let _isDragging = false;
 let _lastPointer = { x: 0, y: 0 };
 const _sensitivity = 0.003;
+let _pendingFirstPerson = false; // 双击飞行后进入表面的标记
 
 // 相机在行星表面的高度偏移（相对半径）
 const SURFACE_OFFSET_RATIO = 0.05;
@@ -77,7 +80,7 @@ export function enterFirstPerson(planetKey) {
     // 重置视角朝向
     _lookEuler.set(0, 0, 0);
 
-    // 立即定位相机到行星表面
+    // 定位相机到行星表面
     positionCameraOnSurface(planetKey, 0);
 
     // 显示提示
@@ -114,6 +117,10 @@ export function exitFirstPerson() {
  */
 export function setOrbitControls(controls) {
     _orbitControls = controls;
+}
+
+export function setCameraController(controller) {
+    _cameraController = controller;
 }
 
 // ============================================================
@@ -163,40 +170,52 @@ function getPlanetWorldPosition(planetKey, time) {
     return worldPos;
 }
 
-function positionCameraOnSurface(planetKey, time) {
+/**
+ * 计算行星表面指定经纬度的相机位置（不在北极）
+ */
+function getSurfacePosition(planetKey, time) {
     const data = PLANET_DATA[planetKey];
     const radius = data ? data.radius : 1;
-    const surfaceHeight = radius * (1 + SURFACE_OFFSET_RATIO);
     const planetPos = getPlanetWorldPosition(planetKey, time);
+    const height = radius * (1 + SURFACE_OFFSET_RATIO);
 
-    _camera.position.set(
-        planetPos.x,
-        planetPos.y + surfaceHeight,
-        planetPos.z
+    // 使用 30° 纬度，避免在北极点导致的视角问题
+    const lat = 30 * Math.PI / 180;
+    const lon = 0;
+
+    return new THREE.Vector3(
+        planetPos.x + height * Math.cos(lat) * Math.cos(lon),
+        planetPos.y + height * Math.sin(lat),
+        planetPos.z + height * Math.cos(lat) * Math.sin(lon)
     );
+}
+
+function positionCameraOnSurface(planetKey, time) {
+    const pos = getSurfacePosition(planetKey, time);
+    _camera.position.copy(pos);
+
+    // 初始往下看一点，看到行星表面和地平线
+    _lookEuler.set(-0.2, 0, 0);
+
+    // 直接使用欧拉角旋转，避免 lookAt + up 导致的万向锁
+    _camera.rotation.order = 'YXZ';
+    _camera.rotation.x = _lookEuler.x;
+    _camera.rotation.y = _lookEuler.y;
+    _camera.rotation.z = 0;
 }
 
 function updateCameraFollowPlanet(time) {
     if (!_currentPlanetKey) return;
 
-    const planetPos = getPlanetWorldPosition(_currentPlanetKey, time);
-    const data = PLANET_DATA[_currentPlanetKey];
-    const radius = data ? data.radius : 1;
-    const surfaceHeight = radius * (1 + SURFACE_OFFSET_RATIO);
+    // 相机始终跟随行星表面位置
+    const pos = getSurfacePosition(_currentPlanetKey, time);
+    _camera.position.copy(pos);
 
-    _camera.position.set(
-        planetPos.x,
-        planetPos.y + surfaceHeight,
-        planetPos.z
-    );
-
-    // 根据环顾角度计算看向的方向
-    const lookDir = new THREE.Vector3(0, 0, -1);
-    lookDir.applyEuler(_lookEuler);
-
-    const lookTarget = _camera.position.clone().add(lookDir);
-    _camera.lookAt(lookTarget);
-    _camera.up.set(0, 1, 0);
+    // 直接设置旋转，不做 lookAt，避免欧拉角与 lookAt 的冲突
+    _camera.rotation.order = 'YXZ';
+    _camera.rotation.x = _lookEuler.x;
+    _camera.rotation.y = _lookEuler.y;
+    _camera.rotation.z = 0;
 }
 
 // ============================================================
@@ -206,9 +225,6 @@ function updateCameraFollowPlanet(time) {
 function setupEventListeners() {
     const canvas = _renderer.domElement;
 
-    // 双击进入/退出第一人称
-    canvas.addEventListener('dblclick', onDoubleClick);
-
     // 鼠标/触摸拖拽环顾
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
@@ -217,47 +233,33 @@ function setupEventListeners() {
 
     // ESC 退出
     window.addEventListener('keydown', onKeyDown);
-}
 
-function onDoubleClick(event) {
-    if (_isActive) {
-        exitFirstPerson();
-        return;
-    }
-
-    // 射线检测点击了哪个行星
-    const mouse = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-    );
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, _camera);
-
-    const clickableObjects = [];
-    _scene.traverse((child) => {
-        if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'moon')) {
-            clickableObjects.push(child);
+    // 飞行到达后自动进入表面
+    window.addEventListener('cameraArrived', (e) => {
+        if (_pendingFirstPerson && e.detail && e.detail.name) {
+            _pendingFirstPerson = false;
+            // 根据中文名反向查找行星 key
+            for (const [key, data] of Object.entries(PLANET_DATA)) {
+                if (data.name === e.detail.name && _planets[key]) {
+                    enterFirstPerson(key);
+                    break;
+                }
+            }
         }
     });
-
-    const intersects = raycaster.intersectObjects(clickableObjects);
-    if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        const key = obj.userData.key || (obj.userData.type === 'sun' ? 'sun' : null);
-        if (key) {
-            enterFirstPerson(key);
-        }
-    }
 }
+
+let _pointerMoved = false;
 
 function onPointerDown(event) {
     if (!_isActive) return;
     _isDragging = true;
+    _pointerMoved = false;
     _lastPointer.x = event.clientX;
     _lastPointer.y = event.clientY;
     _renderer.domElement.style.cursor = 'grabbing';
-    event.preventDefault();
+    // 捕获指针：拖拽移出画布后仍然能收到事件
+    _renderer.domElement.setPointerCapture(event.pointerId);
 }
 
 function onPointerMove(event) {
@@ -265,6 +267,7 @@ function onPointerMove(event) {
 
     const dx = event.clientX - _lastPointer.x;
     const dy = event.clientY - _lastPointer.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) _pointerMoved = true;
     _lastPointer.x = event.clientX;
     _lastPointer.y = event.clientY;
 
@@ -275,10 +278,11 @@ function onPointerMove(event) {
     _lookEuler.x = Math.max(-Math.PI * 85 / 180, Math.min(Math.PI * 85 / 180, _lookEuler.x));
 }
 
-function onPointerUp() {
+function onPointerUp(event) {
     if (!_isActive || !_isDragging) return;
     _isDragging = false;
     _renderer.domElement.style.cursor = 'default';
+    _renderer.domElement.releasePointerCapture(event.pointerId);
 }
 
 function onKeyDown(event) {

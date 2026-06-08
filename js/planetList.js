@@ -88,7 +88,7 @@ export class PlanetList {
 
     const target = this.targets[key];
     if (target) {
-      this.cameraController.selectPlanet(target);
+      this.cameraController.selectPlanet(target, true);
     }
 
     if (window.innerWidth < 768) {

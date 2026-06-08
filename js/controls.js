@@ -19,6 +19,11 @@ export class CameraController {
 
         this.setupControls();
         this.setupEventListeners();
+
+        // 第一人称视角状态下禁用 click 和 hover 干扰
+        this.isFirstPerson = false;
+        window.addEventListener('firstPersonEnter', () => { this.isFirstPerson = true; });
+        window.addEventListener('firstPersonExit', () => { this.isFirstPerson = false; });
     }
 
     setupControls() {
@@ -56,6 +61,9 @@ export class CameraController {
     }
 
     handleClick(event) {
+        // 第一人称模式下跳过，避免干扰拖拽环顾
+        if (this.isFirstPerson) return;
+
         // 计算鼠标位置
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -66,15 +74,23 @@ export class CameraController {
         // 获取所有可点击对象
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'moon' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
                 clickableObjects.push(child);
             }
         });
 
-        const intersects = this.raycaster.intersectObjects(clickableObjects);
+        const intersects = this.raycaster.intersectObjects(clickableObjects, false);
 
         if (intersects.length > 0) {
-            const clickedObject = intersects[0].object;
+            let clickedObject = intersects[0].object;
+            // 如果点击的对象没有行星数据，向上遍历父级查找
+            while (clickedObject && !(clickedObject.userData && clickedObject.userData.type && clickedObject.userData.data)) {
+                clickedObject = clickedObject.parent;
+            }
+            if (!clickedObject) {
+                this.deselectPlanet();
+                return;
+            }
             this.selectPlanet(clickedObject);
         } else {
             this.deselectPlanet();
@@ -82,6 +98,12 @@ export class CameraController {
     }
 
     handleMouseMove(event) {
+        // 第一人称模式下只重置光标，跳过射线检测
+        if (this.isFirstPerson) {
+            this.renderer.domElement.style.cursor = 'default';
+            return;
+        }
+
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -89,12 +111,12 @@ export class CameraController {
 
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'moon' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
                 clickableObjects.push(child);
             }
         });
 
-        const intersects = this.raycaster.intersectObjects(clickableObjects);
+        const intersects = this.raycaster.intersectObjects(clickableObjects, false);
 
         if (intersects.length > 0) {
             this.renderer.domElement.style.cursor = 'pointer';
@@ -103,7 +125,7 @@ export class CameraController {
         }
     }
 
-    selectPlanet(planet) {
+    selectPlanet(planet, shouldFly = false) {
         this.selectedPlanet = planet;
 
         // 触发自定义事件
@@ -117,8 +139,9 @@ export class CameraController {
         });
         window.dispatchEvent(event);
 
-        // 飞行动画
-        this.flyToPlanet(planet);
+        if (shouldFly) {
+            this.flyToPlanet(planet);
+        }
     }
 
     deselectPlanet() {
@@ -246,21 +269,37 @@ export class CameraController {
             const predictedPos = new THREE.Vector3(
                 earthPos.x + localPos.x, earthPos.y + localPos.y, earthPos.z + localPos.z
             );
-            // 旅行者一号不走预测逻辑，直接取当前位置
+            // 旅行者一号：直接取当前位置，相机位于旅行者前进方向的前方，回望太阳系
             if (planet.userData.key === 'voyager') {
                 const curPos = new THREE.Vector3();
                 planet.getWorldPosition(curPos);
-                predictedPos.copy(curPos);
+
+                // 旅行者沿 X 轴正方向远离太阳，轨道容器绕 X 轴旋转了 35°
+                // 前进方向大致为 (1, 0, 0) 经 35° X 轴旋转
+                const dir = new THREE.Vector3(1, 0, 0);
+                const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(35));
+                dir.applyQuaternion(q);
+                dir.normalize();
+
+                // 相机在旅行者前方，回望太阳系
+                const lookDist = 8;
+                const cameraTarget = curPos.clone().add(dir.clone().multiplyScalar(lookDist));
+                this.animateFly(cameraTarget, curPos, duration, () => {
+                    window.dispatchEvent(new CustomEvent('cameraArrived', {
+                        detail: { name: planet.userData.name, data: planet.userData.data }
+                    }));
+                });
+            } else {
+                const dist = 12;
+                const cameraTarget = new THREE.Vector3(
+                    predictedPos.x + dist, predictedPos.y + dist * 0.3, predictedPos.z + dist
+                );
+                this.animateFly(cameraTarget, predictedPos, duration, () => {
+                    window.dispatchEvent(new CustomEvent('cameraArrived', {
+                        detail: { name: planet.userData.name, data: planet.userData.data }
+                    }));
+                });
             }
-            const dist = 12;
-            const cameraTarget = new THREE.Vector3(
-                predictedPos.x + dist, predictedPos.y + dist * 0.3, predictedPos.z + dist
-            );
-            this.animateFly(cameraTarget, predictedPos, duration, () => {
-                window.dispatchEvent(new CustomEvent('cameraArrived', {
-                    detail: { name: planet.userData.name, data: planet.userData.data }
-                }));
-            });
             return;
         }
 
@@ -304,21 +343,42 @@ export class CameraController {
         const startTarget = this.controls.target.clone();
         const startTime = Date.now();
 
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = this.easeInOutCubic(progress);
-
-            this.camera.position.lerpVectors(startPosition, cameraTarget, eased);
-            this.camera.up.set(0, 1, 0);
-            this.controls.target.lerpVectors(startTarget, lookAtTarget, eased);
-            this.controls.update();
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
+        // 安全超时：如果动画 5 秒内未完成，强制重置 isAnimating
+        const safetyTimeout = setTimeout(() => {
+            if (this.isAnimating) {
+                console.warn('animateFly 安全超时，强制重置 isAnimating');
                 this.isAnimating = false;
-                if (onComplete) onComplete();
+            }
+        }, duration + 3500);
+
+        const animate = () => {
+            try {
+                // 如果外部取消了动画，立即退出
+                if (!this.isAnimating) {
+                    clearTimeout(safetyTimeout);
+                    return;
+                }
+
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = this.easeInOutCubic(progress);
+
+                this.camera.position.lerpVectors(startPosition, cameraTarget, eased);
+                this.camera.up.set(0, 1, 0);
+                this.controls.target.lerpVectors(startTarget, lookAtTarget, eased);
+                this.controls.update();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    clearTimeout(safetyTimeout);
+                    this.isAnimating = false;
+                    if (onComplete) onComplete();
+                }
+            } catch (err) {
+                console.error('animateFly 出错:', err);
+                clearTimeout(safetyTimeout);
+                this.isAnimating = false;
             }
         };
 
@@ -333,6 +393,10 @@ export class CameraController {
 
     resetView() {
         this.flyToPosition(new THREE.Vector3(0, 50, 100), new THREE.Vector3(0, 0, 0));
+    }
+
+    cancelFlyAnimation() {
+        this.isAnimating = false;
     }
 
     flyToPosition(targetPosition, targetLookAt, duration = 1500) {

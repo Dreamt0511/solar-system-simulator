@@ -20,7 +20,7 @@ import { createSpacecraft } from './spacecraft.js';
 import { createSolarFlares, updateSolarFlares } from './solarFlares.js';
 import { createPlanetDetails, updatePlanetDetails } from './planetDetails.js';
 import { createCosmicPhenomena, updateCosmicPhenomena } from './cosmicPhenomena.js';
-import { createFirstPerson, updateFirstPerson, setOrbitControls } from './firstPerson.js';
+import { createFirstPerson, updateFirstPerson, setOrbitControls, setCameraController } from './firstPerson.js';
 
 class SolarSystemApp {
     constructor() {
@@ -180,6 +180,7 @@ class SolarSystemApp {
         // 初始化第一人称视角 + 镜头光晕
         this.firstPerson = createFirstPerson(this.renderer, this.camera, this.scene, this.planets);
         setOrbitControls(this.cameraController.controls);
+        setCameraController(this.cameraController);
 
         // 初始化后处理
         this.postProcessing = new PostProcessing(this.renderer, this.scene, this.camera);
@@ -305,17 +306,6 @@ class SolarSystemApp {
             });
         }
 
-        // 拉格朗日点开关
-        const lagrangeBtn = document.getElementById('lagrange-toggle');
-        if (lagrangeBtn) {
-            lagrangeBtn.addEventListener('click', () => {
-                if (!this.cosmicPhenomena) return;
-                const visible = !this.cosmicPhenomena.lagrangePoints.group.visible;
-                this.cosmicPhenomena.lagrangePoints.group.visible = visible;
-                lagrangeBtn.style.background = visible ? '#4CAF50' : '';
-            });
-        }
-
         // 宜居带开关
         const habitableBtn = document.getElementById('habitable-toggle');
         if (habitableBtn) {
@@ -432,7 +422,12 @@ class SolarSystemApp {
         this.updateRings();
 
         // 渲染
-        this.postProcessing.render();
+        try {
+            this.postProcessing.render();
+        } catch (e) {
+            // 后处理渲染失败时回退到直接渲染
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     updatePlanets() {

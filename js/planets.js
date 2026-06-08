@@ -80,6 +80,7 @@ export const PLANET_DATA = {
         }
     },
     moon: {
+        name: '月球',
         radius: 0.4,
         color: 0x999999,
         distance: 2.5,
@@ -345,7 +346,7 @@ export function createAtmosphere(scene, planet, color) {
 // 创建土星环
 export function createSaturnRings(scene, saturn) {
     const innerRadius = saturn.geometry.parameters.radius * 1.2;
-    const outerRadius = saturn.geometry.parameters.radius * 2.5;
+    const outerRadius = saturn.geometry.parameters.radius * 1.8;
 
     const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
 
@@ -400,7 +401,7 @@ export function createAllPlanets(scene) {
         color: moonData.color
     });
     planets.moon = new THREE.Mesh(moonGeometry, moonMaterial);
-    planets.moon.userData = { type: 'moon', data: moonData };
+    planets.moon.userData = { type: 'moon', key: 'moon', data: moonData };
 
     // 月球光晕
     if (!planetGlowTexture) {

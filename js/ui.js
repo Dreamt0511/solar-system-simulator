@@ -134,17 +134,18 @@ export class UIManager {
             setTimeout(() => this.checkOrientation(), 100);
         });
 
-        // 关闭引文弹窗
+        // 关闭引文弹窗（点击关闭按钮、容器本身或按 ESC）
         if (this.elements.quoteClose) {
             this.elements.quoteClose.addEventListener('click', () => {
                 this.hideQuoteOverlay();
             });
         }
-        if (this.elements.quoteOverlay) {
-            this.elements.quoteOverlay.addEventListener('click', (e) => {
-                if (e.target === this.elements.quoteOverlay || e.target.classList.contains('quote-backdrop')) {
-                    this.hideQuoteOverlay();
-                }
+        // 点击引文容器任意位置关闭
+        const quoteContainer = document.querySelector('#pale-blue-dot .quote-container');
+        if (quoteContainer) {
+            quoteContainer.addEventListener('click', (e) => {
+                if (e.target === this.elements.quoteClose) return;
+                this.hideQuoteOverlay();
             });
         }
 

@@ -1,185 +1,10 @@
 import * as THREE from 'three';
-import { PLANET_DATA } from './planets.js';
+
 
 // ============================================================
 // 宇宙现象模块
-// 拉格朗日点 L1-L5、宜居带、凌日现象
+// 宜居带、凌日现象
 // ============================================================
-
-// ---------- 拉格朗日点 ----------
-
-/**
- * 创建文字精灵（用于拉格朗日点标签）
- */
-function createTextSprite(text, color = '#ffffff', fontSize = 48) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = color;
-    ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 64, 32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthWrite: false
-    });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(2, 1, 1);
-    return sprite;
-}
-
-/**
- * 创建单个拉格朗日点标记
- */
-function createLagrangeMarker(label, position, color = 0xffffaa) {
-    const group = new THREE.Group();
-
-    // 小光点（加大）
-    const dotGeo = new THREE.SphereGeometry(0.5, 8, 8);
-    const dotMat = new THREE.MeshBasicMaterial({ color });
-    const dot = new THREE.Mesh(dotGeo, dotMat);
-    group.add(dot);
-
-    // 光晕（加亮加大）
-    const glowCanvas = document.createElement('canvas');
-    glowCanvas.width = 64;
-    glowCanvas.height = 64;
-    const gCtx = glowCanvas.getContext('2d');
-    const grad = gCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(255,255,200,0.9)');
-    grad.addColorStop(0.3, 'rgba(255,255,200,0.4)');
-    grad.addColorStop(1, 'rgba(255,255,200,0)');
-    gCtx.fillStyle = grad;
-    gCtx.fillRect(0, 0, 64, 64);
-    const glowTex = new THREE.CanvasTexture(glowCanvas);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: glowTex,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-    }));
-    glow.scale.set(4, 4, 1);
-    group.add(glow);
-
-    // 文字标签
-    const sprite = createTextSprite(label, '#ffffaa');
-    sprite.position.y = 0.8;
-    group.add(sprite);
-
-    group.position.copy(position);
-    group.visible = false;
-    return group;
-}
-
-/**
- * 计算并创建地月拉格朗日点 L1-L5
- *
- * 地球距离太阳 25.7 视觉单位，月球距离地球 2.5 视觉单位。
- * L1: 地月连线上、距地球约 85% 地月距离处（靠近月球侧）
- * L2: 地月连线上、月球外侧约 115% 地月距离处
- * L3: 太阳对面（与地球关于太阳对称）
- * L4/L5: 地球轨道前后 60° 位置（与太阳、地球构成等边三角形）
- */
-function createLagrangePoints() {
-    const EARTH_DIST = PLANET_DATA.earth.distance;   // 25.7
-    const MOON_DIST = PLANET_DATA.moon.distance;      // 2.5
-
-    const group = new THREE.Group();
-
-    // 需要获取地球当前位置来定位 L1-L5
-    // 由于 L1-L5 跟随地球运动，我们在 update 中动态设置位置
-    // 这里先创建占位 marker，update 时再定位
-
-    const markers = {
-        L1: createLagrangeMarker('L1', new THREE.Vector3(), 0xffffaa),
-        L2: createLagrangeMarker('L2', new THREE.Vector3(), 0xffffaa),
-        L3: createLagrangeMarker('L3', new THREE.Vector3(), 0xaaffaa),
-        L4: createLagrangeMarker('L4', new THREE.Vector3(), 0xaaddff),
-        L5: createLagrangeMarker('L5', new THREE.Vector3(), 0xaaddff),
-    };
-
-    Object.values(markers).forEach(m => group.add(m));
-
-    group.visible = false;
-
-    return { group, markers, EARTH_DIST, MOON_DIST };
-}
-
-/**
- * 更新拉格朗日点位置（跟随地球运动）
- */
-function updateLagrangePoints(lagrange, planets, time) {
-    if (!lagrange.group.visible) return;
-
-    const earth = planets.earth;
-    if (!earth) return;
-
-    // 获取地球在世界坐标系中的位置
-    const earthWorldPos = new THREE.Vector3();
-    earth.getWorldPosition(earthWorldPos);
-
-    const earthAngle = Math.atan2(earthWorldPos.x, earthWorldPos.z);
-    const EARTH_DIST = lagrange.EARTH_DIST;
-    const MOON_DIST = lagrange.MOON_DIST;
-
-    // 获取月球相对于地球的方向（在地月轨道面上）
-    const moon = planets.moon;
-    let moonDirXZ = { x: 0, z: 1 };
-    if (moon) {
-        const moonWorldPos = new THREE.Vector3();
-        moon.getWorldPosition(moonWorldPos);
-        const dx = moonWorldPos.x - earthWorldPos.x;
-        const dz = moonWorldPos.z - earthWorldPos.z;
-        const len = Math.sqrt(dx * dx + dz * dz);
-        if (len > 0.001) {
-            moonDirXZ = { x: dx / len, z: dz / len };
-        }
-    }
-
-    // L1: 地月之间，距地球 ~85% 地月距离
-    const l1Dist = MOON_DIST * 0.85;
-    lagrange.markers.L1.position.set(
-        earthWorldPos.x + moonDirXZ.x * l1Dist,
-        earthWorldPos.y,
-        earthWorldPos.z + moonDirXZ.z * l1Dist
-    );
-
-    // L2: 月球外侧，距地球 ~115% 地月距离
-    const l2Dist = MOON_DIST * 1.15;
-    lagrange.markers.L2.position.set(
-        earthWorldPos.x + moonDirXZ.x * l2Dist,
-        earthWorldPos.y,
-        earthWorldPos.z + moonDirXZ.z * l2Dist
-    );
-
-    // L3: 太阳对面（与地球关于原点对称）
-    lagrange.markers.L3.position.set(
-        -earthWorldPos.x,
-        earthWorldPos.y,
-        -earthWorldPos.z
-    );
-
-    // L4: 地球轨道前方 60°（逆时针方向）
-    const angle4 = earthAngle - Math.PI / 3;
-    lagrange.markers.L4.position.set(
-        Math.sin(angle4) * EARTH_DIST,
-        earthWorldPos.y,
-        Math.cos(angle4) * EARTH_DIST
-    );
-
-    // L5: 地球轨道后方 60°
-    const angle5 = earthAngle + Math.PI / 3;
-    lagrange.markers.L5.position.set(
-        Math.sin(angle5) * EARTH_DIST,
-        earthWorldPos.y,
-        Math.cos(angle5) * EARTH_DIST
-    );
-}
 
 // ---------- 宜居带 ----------
 
@@ -336,18 +161,16 @@ function updateSingleTransit(disc, planet, sunPos, sunToCamera, sunToCameraDist,
 /**
  * 创建所有宇宙现象并添加到场景
  * @param {THREE.Scene} scene
- * @returns {Object} phenomena - 包含 lagrangePoints, habitableZone, transits
+ * @returns {Object} phenomena - 包含 habitableZone, transits
  */
 export function createCosmicPhenomena(scene) {
-    const lagrangePoints = createLagrangePoints();
     const habitableZone = createHabitableZone();
     const transits = createTransits();
 
-    scene.add(lagrangePoints.group);
     scene.add(habitableZone);
     scene.add(transits.group);
 
-    return { lagrangePoints, habitableZone, transits };
+    return { habitableZone, transits };
 }
 
 /**
@@ -358,6 +181,5 @@ export function createCosmicPhenomena(scene) {
  * @param {number} time - 模拟时间
  */
 export function updateCosmicPhenomena(phenomena, planets, camera, time) {
-    updateLagrangePoints(phenomena.lagrangePoints, planets, time);
     updateTransits(phenomena.transits, planets, camera, time);
 }
