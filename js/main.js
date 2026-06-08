@@ -16,6 +16,11 @@ import { getCurrentMeanAnomalies } from './ephemeris.js';
 import { createComet, updateComet } from './comet.js';
 import { createTrails, updateTrail } from './trailEffect.js';
 import { createSolarCorona, updateSolarCorona } from './solarCorona.js';
+import { createSpacecraft } from './spacecraft.js';
+import { createSolarFlares, updateSolarFlares } from './solarFlares.js';
+import { createPlanetDetails, updatePlanetDetails } from './planetDetails.js';
+import { createCosmicPhenomena, updateCosmicPhenomena } from './cosmicPhenomena.js';
+import { createFirstPerson, updateFirstPerson, setOrbitControls } from './firstPerson.js';
 
 class SolarSystemApp {
     constructor() {
@@ -36,6 +41,11 @@ class SolarSystemApp {
         this.comet = null;
         this.trails = null;
         this.corona = null;
+        this.spacecraft = null;
+        this.solarFlares = null;
+        this.planetDetails = null;
+        this.cosmicPhenomena = null;
+        this.firstPerson = null;
 
         this.clock = new THREE.Clock();
         this.simulationTime = 0;
@@ -136,10 +146,24 @@ class SolarSystemApp {
         this.trails = createTrails(this.scene, PLANET_DATA);
         this.corona = createSolarCorona(this.scene);
 
+        // 创建航天器（ISS、天宫、星链、旅行者一号）
+        this.spacecraft = createSpacecraft(this.scene);
+
+        // 创建太阳耀斑/日珥/CME
+        this.solarFlares = createSolarFlares(this.scene);
+
+        // 创建行星细节（大红斑、土星环阴影、地球夜景、极光）
+        this.planetDetails = createPlanetDetails(this.scene, this.planets);
+
+        // 创建宇宙现象（拉格朗日点、宜居带、凌日）
+        this.cosmicPhenomena = createCosmicPhenomena(this.scene);
+
         this.uiManager.setLoadingProgress(78, '初始化材质系统...');
 
-        // 创建材质切换器（此时 extendedBodies 已存在）
-        this.materialSwitcher = new MaterialSwitcher(this.planets, this.textureManager.cache, this.extendedBodies);
+        // 创建材质切换器（此时 extendedBodies、planetDetails 已存在）
+        this.materialSwitcher = new MaterialSwitcher(
+            this.planets, this.textureManager.cache, this.extendedBodies, this.planetDetails?.earthNightShader
+        );
 
         // 纹理按钮可用
         const textureBtn = document.getElementById('texture-toggle');
@@ -153,6 +177,10 @@ class SolarSystemApp {
         // 初始化相机控制器
         this.cameraController = new CameraController(this.camera, this.renderer, this.scene);
 
+        // 初始化第一人称视角 + 镜头光晕
+        this.firstPerson = createFirstPerson(this.renderer, this.camera, this.scene, this.planets);
+        setOrbitControls(this.cameraController.controls);
+
         // 初始化后处理
         this.postProcessing = new PostProcessing(this.renderer, this.scene, this.camera);
 
@@ -163,7 +191,11 @@ class SolarSystemApp {
                 asteroidBelt: this.asteroidBelt?.hitMesh,
                 ceres: this.extendedBodies?.ceres,
                 pluto: this.extendedBodies?.pluto,
-                halley: this.comet?.nucleus
+                halley: this.comet?.nucleus,
+                iss: this.spacecraft?.iss?.mesh,
+                tiangong: this.spacecraft?.tiangong?.mesh,
+                starlink: this.spacecraft?.starlink?.mesh,
+                voyager: this.spacecraft?.voyager?.mesh
             },
             this.cameraController
         );
@@ -272,6 +304,39 @@ class SolarSystemApp {
                 extraOrbitsBtn.textContent = visible ? '隐藏扩展轨道' : '显示扩展轨道';
             });
         }
+
+        // 拉格朗日点开关
+        const lagrangeBtn = document.getElementById('lagrange-toggle');
+        if (lagrangeBtn) {
+            lagrangeBtn.addEventListener('click', () => {
+                if (!this.cosmicPhenomena) return;
+                const visible = !this.cosmicPhenomena.lagrangePoints.group.visible;
+                this.cosmicPhenomena.lagrangePoints.group.visible = visible;
+                lagrangeBtn.style.background = visible ? '#4CAF50' : '';
+            });
+        }
+
+        // 宜居带开关
+        const habitableBtn = document.getElementById('habitable-toggle');
+        if (habitableBtn) {
+            habitableBtn.addEventListener('click', () => {
+                if (!this.cosmicPhenomena) return;
+                const visible = !this.cosmicPhenomena.habitableZone.visible;
+                this.cosmicPhenomena.habitableZone.visible = visible;
+                habitableBtn.style.background = visible ? '#4CAF50' : '';
+            });
+        }
+
+        // 星链开关
+        const starlinkBtn = document.getElementById('starlink-toggle');
+        if (starlinkBtn) {
+            starlinkBtn.addEventListener('click', () => {
+                if (!this.spacecraft?.starlink) return;
+                const visible = starlinkBtn.classList.toggle('active');
+                this.spacecraft.starlink.worldGroup.visible = visible;
+                starlinkBtn.textContent = visible ? '隐藏星链' : '显示星链';
+            });
+        }
     }
 
     animate() {
@@ -314,6 +379,31 @@ class SolarSystemApp {
         }
         if (this.comet) {
             updateComet(this.comet, this.simulationTime);
+        }
+
+        // 更新航天器
+        if (this.spacecraft) {
+            this.spacecraft.update(this.simulationTime);
+        }
+
+        // 更新太阳耀斑/日珥/CME
+        if (this.solarFlares) {
+            updateSolarFlares(this.solarFlares, this.simulationTime);
+        }
+
+        // 更新行星细节（大红斑、极光等）
+        if (this.planetDetails) {
+            updatePlanetDetails(this.planetDetails, this.simulationTime);
+        }
+
+        // 更新宇宙现象（拉格朗日点、凌日）
+        if (this.cosmicPhenomena) {
+            updateCosmicPhenomena(this.cosmicPhenomena, this.planets, this.camera, this.simulationTime);
+        }
+
+        // 更新第一人称视角 + 镜头光晕
+        if (this.firstPerson) {
+            updateFirstPerson(this.firstPerson, this.simulationTime);
         }
 
         // 更新轨道拖尾和日冕

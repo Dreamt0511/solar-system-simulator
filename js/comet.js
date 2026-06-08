@@ -51,7 +51,7 @@ export class Comet {
             COMET_DATA.eccentricity,
             COMET_DATA.inclination,
             0x66aadd,
-            0.08
+            0.3
         );
         this.orbitLine.visible = false;
 

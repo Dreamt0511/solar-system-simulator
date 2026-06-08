@@ -13,6 +13,9 @@ const LIST_ITEMS = [
   { key: 'pluto', label: '冥王星', color: '#bfb0a0' },
   { key: 'asteroidBelt', label: '小行星带', color: '#9a8468' },
   { key: 'halley', label: '哈雷彗星', color: '#66aadd' },
+	  { key: 'iss', label: '国际空间站 ISS', color: '#cccccc' },
+	  { key: 'tiangong', label: '中国空间站 天宫', color: '#ddeeff' },
+	  { key: 'voyager', label: '旅行者一号', color: '#ddb833' },
 ];
 
 export class PlanetList {

@@ -481,7 +481,7 @@ html, body {
     top: 50%;
     transform: translateY(-50%);
     width: 150px;
-    max-height: 240px;
+    max-height: 320px;
     background: rgba(20, 20, 40, 0.92);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -559,7 +559,7 @@ html, body {
         bottom: 0;
         transform: none;
         width: 130px;
-        max-height: 280px;
+        max-height: 35vh;
     }
 }
 

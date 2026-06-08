@@ -66,7 +66,7 @@ export class CameraController {
         // 获取所有可点击对象
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
                 clickableObjects.push(child);
             }
         });
@@ -89,7 +89,7 @@ export class CameraController {
 
         const clickableObjects = [];
         this.scene.traverse((child) => {
-            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet')) {
+            if (child.userData && (child.userData.type === 'planet' || child.userData.type === 'sun' || child.userData.type === 'asteroidBelt' || child.userData.type === 'dwarfPlanet' || child.userData.type === 'comet' || child.userData.type === 'spacecraft')) {
                 clickableObjects.push(child);
             }
         });
@@ -217,6 +217,48 @@ export class CameraController {
             this.animateFly(cameraTarget, targetPos, duration, () => {
                 window.dispatchEvent(new CustomEvent('cameraArrived', {
                     detail: { name: data.name, data }
+                }));
+            });
+            return;
+        }
+
+        // 航天器特殊处理 — 预测地球位置+航天器相对偏移
+        if (planet.userData && planet.userData.type === 'spacecraft') {
+            const earthData = PLANET_DATA.earth;
+            const futureSimTime = this.isPaused
+                ? (this.simulationTime || 0)
+                : (this.simulationTime || 0) + ((duration + 750) / 1000) * (this.timeSpeed || 1);
+            const earthInitialMA = (earthData.initialMeanAnomaly || 0) * Math.PI / 180;
+            const earthOrbit = new KeplerOrbit(earthData.distance, earthData.orbitalEccentricity, earthData.orbitalInclination);
+            const earthTheta = earthOrbit.getTrueAnomaly(futureSimTime, earthData.orbitalPeriod, earthInitialMA);
+            const earthPos = earthOrbit.getPosition3D(earthTheta);
+            // 航天器在地球局部的位置 (沿轨道方向偏移)
+            const orbitAngle = (2 * Math.PI * futureSimTime) / 3;
+            const incl = (planet.userData.key === 'tiangong') ? -41.5 : (planet.userData.key === 'iss' ? -51.6 : 0);
+            const inclRad = THREE.MathUtils.degToRad(incl);
+            const localPos = new THREE.Vector3(1.8, 0, 0);
+            if (Math.abs(incl) > 0.1) {
+                const qIncl = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), inclRad);
+                localPos.applyQuaternion(qIncl);
+            }
+            const qRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), orbitAngle);
+            localPos.applyQuaternion(qRot);
+            const predictedPos = new THREE.Vector3(
+                earthPos.x + localPos.x, earthPos.y + localPos.y, earthPos.z + localPos.z
+            );
+            // 旅行者一号不走预测逻辑，直接取当前位置
+            if (planet.userData.key === 'voyager') {
+                const curPos = new THREE.Vector3();
+                planet.getWorldPosition(curPos);
+                predictedPos.copy(curPos);
+            }
+            const dist = 12;
+            const cameraTarget = new THREE.Vector3(
+                predictedPos.x + dist, predictedPos.y + dist * 0.3, predictedPos.z + dist
+            );
+            this.animateFly(cameraTarget, predictedPos, duration, () => {
+                window.dispatchEvent(new CustomEvent('cameraArrived', {
+                    detail: { name: planet.userData.name, data: planet.userData.data }
                 }));
             });
             return;

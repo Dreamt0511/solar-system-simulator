@@ -175,7 +175,7 @@ function createDwarfPlanet(scene, key, orbitLines) {
     mesh.userData.orbitGroup = orbitGroup;
 
     // 轨道线（默认隐藏）
-    const orbitLine = createOrbitLine(scene, data.distance, data.orbitalEccentricity, data.orbitalInclination, 0x8899bb, 0.08);
+    const orbitLine = createOrbitLine(scene, data.distance, data.orbitalEccentricity, data.orbitalInclination, 0x8899bb, 0.3);
     orbitLine.visible = false;
     orbitLines.push(orbitLine);
 

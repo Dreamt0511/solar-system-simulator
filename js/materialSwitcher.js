@@ -18,10 +18,11 @@ export class MaterialSwitcher {
      * @param {Object} planets - 由 createAllPlanets() 返回的行星对象
      * @param {Map<string, THREE.Texture>} textureMap - 纹理管理器的缓存 (TextureManager.cache)
      */
-    constructor(planets, textureMap, extendedBodies = {}) {
+    constructor(planets, textureMap, extendedBodies = {}, earthNightShader = null) {
         this.planets = planets;
         this.textureMap = textureMap;
         this.extendedBodies = extendedBodies;
+        this.earthNightShader = earthNightShader;
         this.isTextureMode = false;
 
         // 保存每个行星的原始材质，用于切换回纯色模式
@@ -126,6 +127,48 @@ export class MaterialSwitcher {
 
             const texture = this.textureMap.get(key);
             if (!texture) return;
+
+            // 地球特殊处理：真实纹理 + 昼夜转换
+            if (key === 'earth' && this.earthNightShader) {
+                const shaderMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        dayMap: { value: texture },
+                        nightMap: { value: this.earthNightShader.nightTexture },
+                        sunDirection: { value: new THREE.Vector3(1, 0, 0) },
+                        nightIntensity: { value: 1.5 },
+                    },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        varying vec3 vNormal;
+                        void main() {
+                            vUv = uv;
+                            vNormal = normalize(normalMatrix * normal);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform sampler2D dayMap;
+                        uniform sampler2D nightMap;
+                        uniform vec3 sunDirection;
+                        uniform float nightIntensity;
+                        varying vec2 vUv;
+                        varying vec3 vNormal;
+                        void main() {
+                            vec3 normal = normalize(vNormal);
+                            float NdotL = dot(normal, sunDirection);
+                            float dayFactor = smoothstep(-0.15, 0.25, NdotL);
+                            vec4 dayColor = texture2D(dayMap, vUv);
+                            vec4 nightColor = texture2D(nightMap, vUv);
+                            gl_FragColor = mix(nightColor * nightIntensity, dayColor, dayFactor);
+                        }
+                    `,
+                });
+                planet.material.dispose();
+                planet.material = shaderMat;
+                // 同步引用，让 updatePlanetDetails 的 sunDirection 更新继续生效
+                this.earthNightShader.shaderMaterial = shaderMat;
+                return;
+            }
 
             const newMaterial = new THREE.MeshStandardMaterial({
                 map: texture,
@@ -244,7 +287,7 @@ export class MaterialSwitcher {
             const planet = this.planets[key];
             if (!planet) return;
 
-            // 创建新的纯色材质（不复用旧材质实例，避免已被 dispose 的问题）
+            // 纯色模式：所有行星统一使用 MeshBasicMaterial + 纯色（包括地球）
             const data = PLANET_DATA[key];
             if (data) {
                 const solidMaterial = new THREE.MeshBasicMaterial({
