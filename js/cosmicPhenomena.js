@@ -91,10 +91,10 @@ function updateTransits(transits, planets, camera, time) {
     const sunToCameraDist = sunToCamera.length();
     sunToCamera.normalize();
 
-    // 凌日角阈值：行星和太阳-相机方向的夹角小于此值即视为凌日
-    // 阈值需要考虑太阳半径(10)对应的角大小，再加一些容差
+    // 凌日角阈值：只在行星真正从太阳圆面前方经过时触发
+    // 太阳角半径 + 小容差，确保只有对齐时才显示
     const sunRadius = 10;
-    const transitAngle = Math.atan2(sunRadius * 1.5, sunToCameraDist);
+    const transitAngle = Math.atan2(sunRadius, sunToCameraDist) * 0.6;
 
     // 检测水星凌日
     updateSingleTransit(
