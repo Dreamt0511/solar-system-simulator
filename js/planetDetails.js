@@ -32,15 +32,42 @@ void main() {
 }
 `;
 
-/** 地球日夜混合片段着色器 */
+/** 地球日夜混合片段着色器（含程序化云层） */
 const earthDayNightFragment = `
 uniform sampler2D dayMap;
 uniform sampler2D nightMap;
 uniform vec3 sunDirection;
 uniform float nightIntensity;
+uniform float cloudTime;
 
 varying vec2 vUv;
 varying vec3 vNormal;
+
+// 2D 噪声云
+float cloudNoise(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float smoothCloud(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = cloudNoise(i);
+    float b = cloudNoise(i + vec2(1.0, 0.0));
+    float c = cloudNoise(i + vec2(0.0, 1.0));
+    float d = cloudNoise(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbmCloud(vec2 p) {
+    float v = 0.0, amp = 0.5, freq = 1.0;
+    for (int i = 0; i < 5; i++) {
+        v += amp * smoothCloud(p * freq);
+        amp *= 0.5;
+        freq *= 2.0;
+    }
+    return v;
+}
 
 void main() {
     vec3 normal = normalize(vNormal);
@@ -48,100 +75,26 @@ void main() {
     float dayFactor = smoothstep(-0.15, 0.25, NdotL);
     vec4 dayColor = texture2D(dayMap, vUv);
     vec4 nightColor = texture2D(nightMap, vUv);
-    gl_FragColor = mix(nightColor * nightIntensity, dayColor, dayFactor);
+    vec4 baseColor = mix(nightColor * nightIntensity, dayColor, dayFactor);
+
+    // 程序化云层（随 cloudTime 缓慢漂移）
+    vec2 cloudUv = vUv * 5.0 + vec2(cloudTime * 0.003, 0.0);
+    float cloud = fbmCloud(cloudUv);
+    cloud = max(0.0, (cloud - 0.4) * 2.5);
+    cloud = min(1.0, cloud);
+    // 纬度带
+    float lat = sin(vUv.y * 3.14159);
+    cloud *= 0.25 + 0.75 * pow(lat, 1.2);
+    // 只在日侧半球的云可见
+    cloud *= smoothstep(0.0, 0.3, NdotL);
+
+    vec3 cloudColor = vec3(1.0, 1.0, 1.0);
+    gl_FragColor = vec4(mix(baseColor.rgb, cloudColor, cloud * 0.35), 1.0);
 }
 `;
 
 
 // ---------- 主创建函数 ----------
-
-/**
- * 生成程序化云纹理
- */
-function createCloudTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-
-    function hash(p) {
-        const n = Math.sin(p.x * 127.1 + p.y * 311.7) * 43758.5453;
-        return n - Math.floor(n);
-    }
-
-    function lerp(a, b, t) { return a + (b - a) * t; }
-
-    function smoothNoise(x, y) {
-        const ix = Math.floor(x);
-        const iy = Math.floor(y);
-        const fx = x - ix;
-        const fy = y - iy;
-        const ux = fx * fx * (3 - 2 * fx);
-        const uy = fy * fy * (3 - 2 * fy);
-        const a = hash({x: ix, y: iy});
-        const b = hash({x: ix + 1, y: iy});
-        const c = hash({x: ix, y: iy + 1});
-        const d = hash({x: ix + 1, y: iy + 1});
-        return lerp(lerp(a, b, ux), lerp(c, d, ux), uy);
-    }
-
-    function fbm(x, y, oct) {
-        let v = 0, amp = 0.5, freq = 1;
-        for (let i = 0; i < oct; i++) {
-            v += amp * smoothNoise(x * freq, y * freq);
-            amp *= 0.5;
-            freq *= 2;
-        }
-        return v;
-    }
-
-    const img = ctx.createImageData(canvas.width, canvas.height);
-    const d = img.data;
-
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-            const u = x / canvas.width;
-            const v = y / canvas.height;
-
-            // 混合不同尺度的云
-            let n = fbm(u * 4 + 0.5, v * 4 + 0.5, 5);
-            // 锐化：平方拉大对比度
-            n = Math.pow(n, 1.5);
-            // 纬度权重
-            n *= 0.3 + 0.7 * Math.pow(Math.sin(v * Math.PI), 1.2);
-            // 阈值 + 拉伸
-            n = (n - 0.35) * 2.5;
-            n = Math.max(0, Math.min(1, n));
-
-            const idx = (y * canvas.width + x) * 4;
-            const a = Math.round(n * 255);
-            d[idx] = 255;
-            d[idx + 1] = 255;
-            d[idx + 2] = 255;
-            d[idx + 3] = a;
-        }
-    }
-
-    // 水平无缝
-    const bw = Math.floor(canvas.width * 0.05);
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < bw; x++) {
-            const t = x / bw;
-            const f = t * t * (3 - 2 * t);
-            const i1 = (y * canvas.width + x) * 4 + 3;
-            const i2 = (y * canvas.width + (canvas.width - 1 - x)) * 4 + 3;
-            const blended = Math.round(d[i1] * (1 - f) + d[i2] * f);
-            d[i1] = blended;
-            d[i2] = blended;
-        }
-    }
-    ctx.putImageData(img, 0, 0);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    return texture;
-}
 
 /**
  * 创建行星细节增强效果
@@ -152,7 +105,6 @@ function createCloudTexture() {
 export function createPlanetDetails(scene, planets) {
     const details = {
         earthNightShader: null,
-        earthCloudMesh: null,
         earthAtmosphere: null,
     };
 
@@ -180,6 +132,7 @@ export function createPlanetDetails(scene, planets) {
                 nightMap: { value: nightTexture },
                 sunDirection: { value: new THREE.Vector3(1, 0, 0) },
                 nightIntensity: { value: 1.5 },
+                cloudTime: { value: 0 },
             },
             vertexShader: earthDayNightVertex,
             fragmentShader: earthDayNightFragment,
@@ -195,25 +148,7 @@ export function createPlanetDetails(scene, planets) {
         };
     }
 
-    // ------ 2. 地球云层 ------
-    if (planets.earth) {
-        const earthRadius = planets.earth.geometry.parameters.radius;
-        const cloudTexture = createCloudTexture();
-        const cloudGeometry = new THREE.SphereGeometry(earthRadius * 1.02, 32, 32);
-        const cloudMaterial = new THREE.MeshBasicMaterial({
-            map: cloudTexture,
-            transparent: true,
-            depthWrite: false,
-            side: THREE.FrontSide,
-            opacity: 0.45,
-        });
-        const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
-        cloudMesh.userData.pickable = false;
-        planets.earth.add(cloudMesh);
-        details.earthCloudMesh = { mesh: cloudMesh, texture: cloudTexture };
-    }
-
-    // ------ 3. 地球大气散射（仅在纹理模式可见）------
+    // ------ 2. 地球大气散射（仅在纹理模式可见）------
     if (planets.earth) {
         const earthRadius = planets.earth.geometry.parameters.radius;
         const atmoGeometry = new THREE.SphereGeometry(earthRadius * 1.15, 32, 32);
@@ -254,16 +189,18 @@ export function updatePlanetDetails(details, time) {
     if (details.earthNightShader) {
         const earth = details.earthNightShader.mesh;
         const mat = earth.material;
-        if (mat && mat.uniforms && mat.uniforms.sunDirection) {
-            const earthPos = new THREE.Vector3();
-            earth.getWorldPosition(earthPos);
-            mat.uniforms.sunDirection.value.set(-earthPos.x, -earthPos.y, -earthPos.z).normalize();
+        if (mat && mat.uniforms) {
+            // 更新太阳方向
+            if (mat.uniforms.sunDirection) {
+                const earthPos = new THREE.Vector3();
+                earth.getWorldPosition(earthPos);
+                mat.uniforms.sunDirection.value.set(-earthPos.x, -earthPos.y, -earthPos.z).normalize();
+            }
+            // 更新云层时间
+            if (mat.uniforms.cloudTime !== undefined) {
+                mat.uniforms.cloudTime.value = time;
+            }
         }
-    }
-
-    // 云层旋转（速度约为地球自转的 1.5 倍）
-    if (details.earthCloudMesh) {
-        details.earthCloudMesh.mesh.rotation.y = time * 0.006;
     }
 
     // 更新大气散射太阳方向
