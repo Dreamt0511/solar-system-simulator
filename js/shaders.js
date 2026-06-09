@@ -123,6 +123,53 @@ void main() {
 }
 `;
 
+// 地球大气散射（Rayleigh 散射）
+export const earthAtmosphereVertexShader = `
+varying vec3 vNormal;
+varying vec3 vPosition;
+varying vec3 vWorldPosition;
+
+void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPos.xyz;
+    vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+export const earthAtmosphereFragmentShader = `
+uniform vec3 sunDirection;
+uniform vec3 earthColor;
+
+varying vec3 vNormal;
+varying vec3 vPosition;
+varying vec3 vWorldPosition;
+
+void main() {
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(-vPosition);
+
+    float fresnel = 1.0 - max(0.0, dot(normal, viewDir));
+    fresnel = pow(fresnel, 3.0);
+
+    float sunAngle = max(0.0, dot(normalize(sunDirection), viewDir));
+
+    vec3 blueScatter = vec3(0.3, 0.6, 1.0);
+    vec3 orangeScatter = vec3(1.0, 0.5, 0.2);
+
+    float mixFactor = smoothstep(0.0, 0.5, sunAngle);
+    vec3 scatterColor = mix(orangeScatter, blueScatter, mixFactor);
+
+    float intensity = fresnel * (0.5 + 0.5 * sunAngle);
+    intensity *= 0.8;
+
+    vec3 finalColor = scatterColor * intensity;
+
+    gl_FragColor = vec4(finalColor, intensity * 0.7);
+}
+`;
+
 // 土星环着色器
 export const ringVertexShader = `
 varying vec2 vUv;

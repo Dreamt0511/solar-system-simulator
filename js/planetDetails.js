@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { earthAtmosphereVertexShader, earthAtmosphereFragmentShader } from './shaders.js';
 
 // ============================================================
 // 行星细节增强模块
-// 地球夜景灯光
+// 地球夜景灯光 + 地球云层 + 地球大气散射
 // ============================================================
 
 // ---------- Canvas 纹理生成 ----------
@@ -55,6 +56,74 @@ void main() {
 // ---------- 主创建函数 ----------
 
 /**
+ * 生成程序化云纹理
+ */
+function createCloudTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    function noise(x, y) {
+        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        return n - Math.floor(n);
+    }
+
+    function smoothNoise(x, y) {
+        const ix = Math.floor(x);
+        const iy = Math.floor(y);
+        const fx = x - ix;
+        const fy = y - iy;
+        const a = noise(ix, iy);
+        const b = noise(ix + 1, iy);
+        const c = noise(ix, iy + 1);
+        const d = noise(ix + 1, iy + 1);
+        const ux = fx * fx * (3 - 2 * fx);
+        const uy = fy * fy * (3 - 2 * fy);
+        return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+    }
+
+    function fbm(x, y, octaves) {
+        let value = 0;
+        let amp = 0.5;
+        let freq = 1;
+        for (let i = 0; i < octaves; i++) {
+            value += amp * smoothNoise(x * freq, y * freq);
+            amp *= 0.5;
+            freq *= 2;
+        }
+        return value;
+    }
+
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const data = imageData.data;
+
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            const u = x / canvas.width;
+            const v = y / canvas.height;
+            const latitudeBand = Math.sin(v * Math.PI);
+            const bandFactor = 0.3 + 0.7 * (latitudeBand * 0.8 + 0.2);
+            const n = fbm(u * 6, v * 6, 4);
+            const cloudValue = Math.max(0, Math.min(1, (n * bandFactor - 0.25) * 1.8));
+
+            const idx = (y * canvas.width + x) * 4;
+            const alpha = cloudValue * 255;
+            data[idx] = 255;
+            data[idx + 1] = 255;
+            data[idx + 2] = 255;
+            data[idx + 3] = alpha;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    return texture;
+}
+
+/**
  * 创建行星细节增强效果
  * @param {THREE.Scene} scene
  * @param {Object} planets - { sun, earth, jupiter, saturn, ... }
@@ -63,6 +132,8 @@ void main() {
 export function createPlanetDetails(scene, planets) {
     const details = {
         earthNightShader: null,
+        earthCloudMesh: null,
+        earthAtmosphere: null,
     };
 
     // ------ 1. 地球夜景灯光 ------
@@ -104,6 +175,47 @@ export function createPlanetDetails(scene, planets) {
         };
     }
 
+    // ------ 2. 地球云层 ------
+    if (planets.earth) {
+        const earthRadius = planets.earth.geometry.parameters.radius;
+        const cloudTexture = createCloudTexture();
+        const cloudGeometry = new THREE.SphereGeometry(earthRadius * 1.02, 32, 32);
+        const cloudMaterial = new THREE.MeshBasicMaterial({
+            map: cloudTexture,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            opacity: 0.6,
+        });
+        const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        cloudMesh.userData.pickable = false;
+        planets.earth.add(cloudMesh);
+        details.earthCloudMesh = { mesh: cloudMesh, texture: cloudTexture };
+    }
+
+    // ------ 3. 地球大气散射（仅在纹理模式可见）------
+    if (planets.earth) {
+        const earthRadius = planets.earth.geometry.parameters.radius;
+        const atmoGeometry = new THREE.SphereGeometry(earthRadius * 1.15, 32, 32);
+        const atmoMaterial = new THREE.ShaderMaterial({
+            vertexShader: earthAtmosphereVertexShader,
+            fragmentShader: earthAtmosphereFragmentShader,
+            uniforms: {
+                sunDirection: { value: new THREE.Vector3(1, 0, 0) },
+                earthColor: { value: new THREE.Color(0x2266cc) },
+            },
+            transparent: true,
+            side: THREE.BackSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const atmoMesh = new THREE.Mesh(atmoGeometry, atmoMaterial);
+        atmoMesh.userData.pickable = false;
+        atmoMesh.visible = false; // 默认隐藏，纹理模式才显示
+        planets.earth.add(atmoMesh);
+        details.earthAtmosphere = { mesh: atmoMesh, material: atmoMaterial };
+    }
+
     return details;
 }
 
@@ -127,6 +239,20 @@ export function updatePlanetDetails(details, time) {
             earth.getWorldPosition(earthPos);
             mat.uniforms.sunDirection.value.set(-earthPos.x, -earthPos.y, -earthPos.z).normalize();
         }
+    }
+
+    // 云层旋转（速度约为地球自转的 1.5 倍）
+    if (details.earthCloudMesh) {
+        details.earthCloudMesh.mesh.rotation.y = time * 0.006;
+    }
+
+    // 更新大气散射太阳方向
+    if (details.earthAtmosphere) {
+        const earthPos = new THREE.Vector3();
+        details.earthAtmosphere.mesh.getWorldPosition(earthPos);
+        details.earthAtmosphere.material.uniforms.sunDirection.value.set(
+            -earthPos.x, -earthPos.y, -earthPos.z
+        ).normalize();
     }
 
 }
