@@ -161,8 +161,8 @@ void main() {
     float mixFactor = smoothstep(0.0, 0.5, sunAngle);
     vec3 scatterColor = mix(orangeScatter, blueScatter, mixFactor);
 
-    float intensity = fresnel * (0.5 + 0.5 * sunAngle);
-    intensity *= 0.8;
+    float intensity = fresnel * (0.3 + 0.3 * sunAngle);
+    intensity *= 0.6;
 
     vec3 finalColor = scatterColor * intensity;
 

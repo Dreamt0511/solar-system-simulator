@@ -11,7 +11,6 @@ import { TextureManager } from './textureManager.js';
 import { MaterialSwitcher } from './materialSwitcher.js';
 import { PlanetList } from './planetList.js';
 import { StarfieldBackground } from './starfieldBackground.js';
-import { MilkyWayGalaxy } from './milkyWayGalaxy.js';
 import { createExtendedBodies, EXTENDED_DATA } from './extendedBodies.js';
 import { getCurrentMeanAnomalies } from './ephemeris.js';
 import { createComet, updateComet } from './comet.js';
@@ -39,7 +38,6 @@ class SolarSystemApp {
         this.textureManager = null;
         this.materialSwitcher = null;
         this.starfieldBackground = null;
-        this.galaxy = null;
         this.extendedBodies = null;
         this.comet = null;
         this.trails = null;
@@ -102,8 +100,6 @@ class SolarSystemApp {
         // 初始化纹理系统（后台预加载）
         this.textureManager = new TextureManager();
         this.starfieldBackground = new StarfieldBackground(this.scene);
-        this.galaxy = new MilkyWayGalaxy(this.scene);
-        this.starfieldBackground.setGalaxy(this.galaxy);
         this.texturesLoaded = false;
         this.textureLoadingPromise = this.textureManager.loadAll().then(() => {
             this.texturesLoaded = true;
@@ -456,9 +452,6 @@ class SolarSystemApp {
         // 更新星空闪烁
         if (this.starfield) {
             this.starfield.update(this.simulationTime);
-        }
-        if (this.galaxy) {
-            this.galaxy.update(this.simulationTime);
         }
         if (this.asteroidBelt) {
             this.asteroidBelt.update(this.simulationTime);

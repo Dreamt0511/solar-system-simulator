@@ -17,11 +17,6 @@ export class StarfieldBackground {
         this.isActive = false;
         this.lastIndex = -1;
         this.savedBackground = null;
-        this.galaxy = null;
-    }
-
-    setGalaxy(galaxy) {
-        this.galaxy = galaxy;
     }
 
     async toggle() {
@@ -34,11 +29,6 @@ export class StarfieldBackground {
     }
 
     async show() {
-        // 隐藏银河背景
-        if (this.galaxy) {
-            this.galaxy.setVisible(false);
-        }
-
         let idx;
         do {
             idx = Math.floor(Math.random() * STARFIELD_IMAGES.length);
@@ -64,11 +54,6 @@ export class StarfieldBackground {
         this.scene.background = this.savedBackground;
         this.scene.backgroundIntensity = this.savedIntensity ?? 1;
         this.isActive = false;
-
-        // 恢复银河背景
-        if (this.galaxy) {
-            this.galaxy.setVisible(true);
-        }
     }
 
     dispose() {

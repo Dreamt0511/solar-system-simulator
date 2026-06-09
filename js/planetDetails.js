@@ -64,8 +64,8 @@ function createCloudTexture() {
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    function noise(x, y) {
-        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    function hash(x, y) {
+        const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
         return n - Math.floor(n);
     }
 
@@ -74,12 +74,12 @@ function createCloudTexture() {
         const iy = Math.floor(y);
         const fx = x - ix;
         const fy = y - iy;
-        const a = noise(ix, iy);
-        const b = noise(ix + 1, iy);
-        const c = noise(ix, iy + 1);
-        const d = noise(ix + 1, iy + 1);
         const ux = fx * fx * (3 - 2 * fx);
         const uy = fy * fy * (3 - 2 * fy);
+        const a = hash(ix, iy);
+        const b = hash(ix + 1, iy);
+        const c = hash(ix, iy + 1);
+        const d = hash(ix + 1, iy + 1);
         return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
     }
 
@@ -98,17 +98,49 @@ function createCloudTexture() {
     const imageData = ctx.createImageData(canvas.width, canvas.height);
     const data = imageData.data;
 
+    // 预生成噪声场，然后用无缝拼接的后处理消除水平接缝
+    const temp = new Float32Array(canvas.width * canvas.height);
+
     for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++) {
             const u = x / canvas.width;
             const v = y / canvas.height;
-            const latitudeBand = Math.sin(v * Math.PI);
-            const bandFactor = 0.3 + 0.7 * (latitudeBand * 0.8 + 0.2);
-            const n = fbm(u * 6, v * 6, 4);
-            const cloudValue = Math.max(0, Math.min(1, (n * bandFactor - 0.25) * 1.8));
 
+            // 分形噪声
+            const n = fbm(u * 5, v * 5, 4);
+
+            // 纬度带：赤道云多，两极云少（更真实）
+            const latWeight = 0.4 + 0.6 * Math.pow(Math.sin(v * Math.PI), 1.5);
+
+            // 调低云密度：提高阈值，降低对比度
+            const cloudValue = Math.max(0, Math.min(1, (n * latWeight - 0.45) * 1.5));
+            temp[y * canvas.width + x] = cloudValue;
+        }
+    }
+
+    // 水平无缝处理：靠近左右边缘时，混合对面的像素
+    const blendWidth = Math.floor(canvas.width * 0.08); // 8% 边缘混合
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < blendWidth; x++) {
+            const t = x / blendWidth;
+            const blendFactor = t * t * (3 - 2 * t); // smoothstep
+            const mirrorX = canvas.width - 1 - x;
+            const idx = y * canvas.width + x;
+            const mirrorIdx = y * canvas.width + mirrorX;
+            temp[idx] = temp[idx] * (1 - blendFactor) + temp[mirrorIdx] * blendFactor;
+            // 对称处理右边缘
+            const rx = canvas.width - 1 - x;
+            const ridx = y * canvas.width + rx;
+            temp[ridx] = temp[ridx] * (1 - blendFactor) + temp[y * canvas.width + blendWidth - 1 - x] * blendFactor;
+        }
+    }
+
+    // 写入像素
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            const val = temp[y * canvas.width + x];
             const idx = (y * canvas.width + x) * 4;
-            const alpha = cloudValue * 255;
+            const alpha = Math.round(val * 255);
             data[idx] = 255;
             data[idx + 1] = 255;
             data[idx + 2] = 255;
@@ -185,7 +217,7 @@ export function createPlanetDetails(scene, planets) {
             transparent: true,
             depthWrite: false,
             side: THREE.DoubleSide,
-            opacity: 0.6,
+            opacity: 0.3,
         });
         const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
         cloudMesh.userData.pickable = false;
