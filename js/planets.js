@@ -217,16 +217,16 @@ export function createSun(scene) {
     innerGlow.scale.set(data.radius * 4, data.radius * 4, 1);
     sun.add(innerGlow);
 
-    // 外层光晕 - 更淡
+    // 外层光晕
     const outerGlow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: glowTexture,
         color: 0xff3f1f,
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        opacity: 0.2
+        opacity: 0.5
     }));
-    outerGlow.scale.set(data.radius * 5, data.radius * 5, 1);
+    outerGlow.scale.set(data.radius * 8, data.radius * 8, 1);
     sun.add(outerGlow);
 
     sun.userData.glow = outerGlow;
