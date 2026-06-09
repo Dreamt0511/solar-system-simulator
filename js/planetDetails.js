@@ -64,10 +64,12 @@ function createCloudTexture() {
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    function hash(x, y) {
-        const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    function hash(p) {
+        const n = Math.sin(p.x * 127.1 + p.y * 311.7) * 43758.5453;
         return n - Math.floor(n);
     }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
 
     function smoothNoise(x, y) {
         const ix = Math.floor(x);
@@ -76,78 +78,64 @@ function createCloudTexture() {
         const fy = y - iy;
         const ux = fx * fx * (3 - 2 * fx);
         const uy = fy * fy * (3 - 2 * fy);
-        const a = hash(ix, iy);
-        const b = hash(ix + 1, iy);
-        const c = hash(ix, iy + 1);
-        const d = hash(ix + 1, iy + 1);
-        return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+        const a = hash({x: ix, y: iy});
+        const b = hash({x: ix + 1, y: iy});
+        const c = hash({x: ix, y: iy + 1});
+        const d = hash({x: ix + 1, y: iy + 1});
+        return lerp(lerp(a, b, ux), lerp(c, d, ux), uy);
     }
 
-    function fbm(x, y, octaves) {
-        let value = 0;
-        let amp = 0.5;
-        let freq = 1;
-        for (let i = 0; i < octaves; i++) {
-            value += amp * smoothNoise(x * freq, y * freq);
+    function fbm(x, y, oct) {
+        let v = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < oct; i++) {
+            v += amp * smoothNoise(x * freq, y * freq);
             amp *= 0.5;
             freq *= 2;
         }
-        return value;
+        return v;
     }
 
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
-    const data = imageData.data;
-
-    // 预生成噪声场，然后用无缝拼接的后处理消除水平接缝
-    const temp = new Float32Array(canvas.width * canvas.height);
+    const img = ctx.createImageData(canvas.width, canvas.height);
+    const d = img.data;
 
     for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++) {
             const u = x / canvas.width;
             const v = y / canvas.height;
 
-            // 分形噪声
-            const n = fbm(u * 5, v * 5, 4);
+            // 混合不同尺度的云
+            let n = fbm(u * 4 + 0.5, v * 4 + 0.5, 5);
+            // 锐化：平方拉大对比度
+            n = Math.pow(n, 1.5);
+            // 纬度权重
+            n *= 0.3 + 0.7 * Math.pow(Math.sin(v * Math.PI), 1.2);
+            // 阈值 + 拉伸
+            n = (n - 0.35) * 2.5;
+            n = Math.max(0, Math.min(1, n));
 
-            // 纬度带：赤道云多，两极云少（更真实）
-            const latWeight = 0.4 + 0.6 * Math.pow(Math.sin(v * Math.PI), 1.5);
-
-            // 调低云密度：提高阈值，降低对比度
-            const cloudValue = Math.max(0, Math.min(1, (n * latWeight - 0.45) * 1.5));
-            temp[y * canvas.width + x] = cloudValue;
-        }
-    }
-
-    // 水平无缝处理：靠近左右边缘时，混合对面的像素
-    const blendWidth = Math.floor(canvas.width * 0.08); // 8% 边缘混合
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < blendWidth; x++) {
-            const t = x / blendWidth;
-            const blendFactor = t * t * (3 - 2 * t); // smoothstep
-            const mirrorX = canvas.width - 1 - x;
-            const idx = y * canvas.width + x;
-            const mirrorIdx = y * canvas.width + mirrorX;
-            temp[idx] = temp[idx] * (1 - blendFactor) + temp[mirrorIdx] * blendFactor;
-            // 对称处理右边缘
-            const rx = canvas.width - 1 - x;
-            const ridx = y * canvas.width + rx;
-            temp[ridx] = temp[ridx] * (1 - blendFactor) + temp[y * canvas.width + blendWidth - 1 - x] * blendFactor;
-        }
-    }
-
-    // 写入像素
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-            const val = temp[y * canvas.width + x];
             const idx = (y * canvas.width + x) * 4;
-            const alpha = Math.round(val * 255);
-            data[idx] = 255;
-            data[idx + 1] = 255;
-            data[idx + 2] = 255;
-            data[idx + 3] = alpha;
+            const a = Math.round(n * 255);
+            d[idx] = 255;
+            d[idx + 1] = 255;
+            d[idx + 2] = 255;
+            d[idx + 3] = a;
         }
     }
-    ctx.putImageData(imageData, 0, 0);
+
+    // 水平无缝
+    const bw = Math.floor(canvas.width * 0.05);
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < bw; x++) {
+            const t = x / bw;
+            const f = t * t * (3 - 2 * t);
+            const i1 = (y * canvas.width + x) * 4 + 3;
+            const i2 = (y * canvas.width + (canvas.width - 1 - x)) * 4 + 3;
+            const blended = Math.round(d[i1] * (1 - f) + d[i2] * f);
+            d[i1] = blended;
+            d[i2] = blended;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
@@ -216,8 +204,8 @@ export function createPlanetDetails(scene, planets) {
             map: cloudTexture,
             transparent: true,
             depthWrite: false,
-            side: THREE.DoubleSide,
-            opacity: 0.3,
+            side: THREE.FrontSide,
+            opacity: 0.45,
         });
         const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
         cloudMesh.userData.pickable = false;
