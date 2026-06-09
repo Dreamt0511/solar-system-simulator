@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { earthAtmosphereVertexShader, earthAtmosphereFragmentShader } from './shaders.js';
 
 // ============================================================
 // 行星细节增强模块
@@ -24,15 +23,18 @@ function createNightLightsTexture() {
 const earthDayNightVertex = `
 varying vec2 vUv;
 varying vec3 vNormal;
+varying vec3 vViewPosition;
 
 void main() {
     vUv = uv;
     vNormal = normalize(mat3(modelMatrix) * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vViewPosition = -mvPos.xyz;
+    gl_Position = projectionMatrix * mvPos;
 }
 `;
 
-/** 地球日夜混合片段着色器（含程序化云层） */
+/** 地球日夜混合片段着色器（含程序化云层 + 大气散射） */
 const earthDayNightFragment = `
 uniform sampler2D dayMap;
 uniform sampler2D nightMap;
@@ -42,6 +44,7 @@ uniform float cloudTime;
 
 varying vec2 vUv;
 varying vec3 vNormal;
+varying vec3 vViewPosition;
 
 // 2D 噪声云
 float cloudNoise(vec2 p) {
@@ -82,14 +85,25 @@ void main() {
     float cloud = fbmCloud(cloudUv);
     cloud = max(0.0, (cloud - 0.4) * 2.5);
     cloud = min(1.0, cloud);
-    // 纬度带
     float lat = sin(vUv.y * 3.14159);
     cloud *= 0.25 + 0.75 * pow(lat, 1.2);
-    // 只在日侧半球的云可见
     cloud *= smoothstep(0.0, 0.3, NdotL);
-
     vec3 cloudColor = vec3(1.0, 1.0, 1.0);
-    gl_FragColor = vec4(mix(baseColor.rgb, cloudColor, cloud * 0.35), 1.0);
+    vec3 finalColor = mix(baseColor.rgb, cloudColor, cloud * 0.35);
+
+    // 大气散射边缘光晕（Fresnel 边缘发光）
+    vec3 viewDir = normalize(vViewPosition);
+    float fresnel = 1.0 - max(0.0, dot(normal, viewDir));
+    fresnel = pow(fresnel, 3.0);
+    float sunAngle = max(0.0, dot(normalize(sunDirection), viewDir));
+    vec3 blueScatter = vec3(0.3, 0.6, 1.0);
+    vec3 orangeScatter = vec3(1.0, 0.5, 0.2);
+    float mixFactor = smoothstep(0.0, 0.5, sunAngle);
+    vec3 atmoColor = mix(orangeScatter, blueScatter, mixFactor);
+    float atmoIntensity = fresnel * (0.3 + 0.3 * sunAngle) * 0.6 * 0.7;
+    finalColor += atmoColor * atmoIntensity;
+
+    gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
 
@@ -105,7 +119,6 @@ void main() {
 export function createPlanetDetails(scene, planets) {
     const details = {
         earthNightShader: null,
-        earthAtmosphere: null,
     };
 
     // ------ 1. 地球夜景灯光 ------
@@ -148,29 +161,6 @@ export function createPlanetDetails(scene, planets) {
         };
     }
 
-    // ------ 2. 地球大气散射（仅在纹理模式可见）------
-    if (planets.earth) {
-        const earthRadius = planets.earth.geometry.parameters.radius;
-        const atmoGeometry = new THREE.SphereGeometry(earthRadius * 1.15, 32, 32);
-        const atmoMaterial = new THREE.ShaderMaterial({
-            vertexShader: earthAtmosphereVertexShader,
-            fragmentShader: earthAtmosphereFragmentShader,
-            uniforms: {
-                sunDirection: { value: new THREE.Vector3(1, 0, 0) },
-                earthColor: { value: new THREE.Color(0x2266cc) },
-            },
-            transparent: true,
-            side: THREE.BackSide,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending,
-        });
-        const atmoMesh = new THREE.Mesh(atmoGeometry, atmoMaterial);
-        atmoMesh.userData.pickable = false;
-        atmoMesh.visible = false; // 默认隐藏，纹理模式才显示
-        planets.earth.add(atmoMesh);
-        details.earthAtmosphere = { mesh: atmoMesh, material: atmoMaterial };
-    }
-
     return details;
 }
 
@@ -201,15 +191,6 @@ export function updatePlanetDetails(details, time) {
                 mat.uniforms.cloudTime.value = time;
             }
         }
-    }
-
-    // 更新大气散射太阳方向
-    if (details.earthAtmosphere) {
-        const earthPos = new THREE.Vector3();
-        details.earthAtmosphere.mesh.getWorldPosition(earthPos);
-        details.earthAtmosphere.material.uniforms.sunDirection.value.set(
-            -earthPos.x, -earthPos.y, -earthPos.z
-        ).normalize();
     }
 
 }

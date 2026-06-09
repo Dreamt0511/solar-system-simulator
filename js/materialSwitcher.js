@@ -18,12 +18,11 @@ export class MaterialSwitcher {
      * @param {Object} planets - 由 createAllPlanets() 返回的行星对象
      * @param {Map<string, THREE.Texture>} textureMap - 纹理管理器的缓存 (TextureManager.cache)
      */
-    constructor(planets, textureMap, extendedBodies = {}, earthNightShader = null, planetDetails = null) {
+    constructor(planets, textureMap, extendedBodies = {}, earthNightShader = null) {
         this.planets = planets;
         this.textureMap = textureMap;
         this.extendedBodies = extendedBodies;
         this.earthNightShader = earthNightShader;
-        this.planetDetails = planetDetails;
         this.isTextureMode = false;
 
         // 保存每个行星的原始材质，用于切换回纯色模式
@@ -210,10 +209,7 @@ export class MaterialSwitcher {
             body.material = newMaterial;
         });
 
-        // Show earth atmosphere
-        if (this.planetDetails?.earthAtmosphere) {
-            this.planetDetails.earthAtmosphere.mesh.visible = true;
-        }
+
 
         this.isTextureMode = true;
     }
@@ -284,10 +280,7 @@ export class MaterialSwitcher {
             body.material = solidMaterial;
         });
 
-        // Hide earth atmosphere
-        if (this.planetDetails?.earthAtmosphere) {
-            this.planetDetails.earthAtmosphere.mesh.visible = false;
-        }
+
 
         this.isTextureMode = false;
     }

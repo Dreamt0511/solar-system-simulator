@@ -163,7 +163,7 @@ class SolarSystemApp {
 
         // 创建材质切换器（此时 extendedBodies、planetDetails 已存在）
         this.materialSwitcher = new MaterialSwitcher(
-            this.planets, this.textureManager.cache, this.extendedBodies, this.planetDetails?.earthNightShader, this.planetDetails
+            this.planets, this.textureManager.cache, this.extendedBodies, this.planetDetails?.earthNightShader
         );
 
         // 纹理按钮可用
